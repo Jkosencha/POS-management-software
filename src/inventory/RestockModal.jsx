@@ -13,10 +13,13 @@ export default function RestockModal({ product, onClose, onDone }) {
   const [reason, setReason] = useState('restock')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
+  const [unitCost, setUnitCost] = useState(product.cost_price ?? '')
+  const [supplier, setSupplier] = useState(product.supplier || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   const selected = REASONS.find(r => r.value === reason)
+  const isRestock = reason === 'restock'
   const qtyNum = Number(qty) || 0
   const qtyChange = selected.sign === 0 ? qtyNum : selected.sign * Math.abs(qtyNum)
   const newStock = product.stock + qtyChange
@@ -25,14 +28,27 @@ export default function RestockModal({ product, onClose, onDone }) {
   const handleSubmit = async () => {
     setSaving(true)
     setError(null)
+    const unitCostNum = unitCost === '' ? null : Number(unitCost)
+
     const { error } = await supabase.from('stock_movements').insert({
       product_id: product.id,
       qty_change: qtyChange,
       reason,
       note: note.trim() || null,
+      unit_cost: isRestock ? unitCostNum : null,
     })
+    if (error) { setSaving(false); return setError(error.message) }
+
+    // Restocking updates the product's current cost basis + supplier going forward
+    if (isRestock && (unitCostNum != null || supplier.trim())) {
+      const { error: prodError } = await supabase.from('products').update({
+        ...(unitCostNum != null ? { cost_price: unitCostNum } : {}),
+        ...(supplier.trim() ? { supplier: supplier.trim() } : {}),
+      }).eq('id', product.id)
+      if (prodError) { setSaving(false); return setError(prodError.message) }
+    }
+
     setSaving(false)
-    if (error) return setError(error.message)
     onDone()
   }
 
@@ -87,6 +103,24 @@ export default function RestockModal({ product, onClose, onDone }) {
         }}>
           New stock: {newStock}
           {newStock < 0 ? ' — cannot go below zero' : ''}
+        </div>
+      )}
+
+      {isRestock && (
+        <div className="field-row">
+          <label className="field">
+            <span>Cost per unit (KSh)</span>
+            <input
+              type="number" min="0"
+              value={unitCost}
+              onChange={e => setUnitCost(e.target.value)}
+              placeholder="What you paid"
+            />
+          </label>
+          <label className="field">
+            <span>Supplier</span>
+            <input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="e.g. Metro Wholesalers" />
+          </label>
         </div>
       )}
 

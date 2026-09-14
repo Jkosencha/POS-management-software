@@ -7,7 +7,7 @@ const PAY_METHODS = ['Cash', 'M-Pesa', 'Card']
 const REASON_COLORS = {
   sale:       'var(--surface-3)',
   restock:    'var(--green)',
-  return:     '#0a7a5a',
+  return:     'var(--green-dark)',
   adjustment: 'var(--amber-warn)',
   spoilage:   'var(--red)',
 }
@@ -117,6 +117,21 @@ export default function Reports({ money, role }) {
   const itemCount = sales.reduce((n, s) => n + s.items.reduce((m, i) => m + i.qty, 0), 0)
   const avg       = sales.length ? revenue / sales.length : 0
 
+  // Profit is a lower bound: items sold before cost tracking was set up (or
+  // never restocked with a cost) have no cost_price snapshot and count as $0
+  // cost here, so margin can only be under- not over-stated.
+  let cogs = 0
+  let costedItemCount = 0
+  sales.forEach(s => s.items.forEach(i => {
+    if (i.cost_price != null) {
+      cogs += Number(i.cost_price) * i.qty
+      costedItemCount += i.qty
+    }
+  }))
+  const profit    = revenue - cogs
+  const margin    = revenue > 0 ? (profit / revenue * 100) : 0
+  const hasCostGaps = itemCount > 0 && costedItemCount < itemCount
+
   const topMap = {}
   sales.forEach(s => s.items.forEach(i => {
     topMap[i.name] = topMap[i.name] || { name: i.name, qty: 0, revenue: 0 }
@@ -187,10 +202,21 @@ export default function Reports({ money, role }) {
         <>
           <div className="stats">
             <Stat label="Revenue" value={money(revenue)} accent sub={`${sales.length} sale${sales.length === 1 ? '' : 's'}`} />
+            <Stat
+              label="Profit"
+              value={money(Math.round(profit))}
+              sub={revenue > 0 ? `${margin.toFixed(1)}% margin${hasCostGaps ? ' · partial' : ''}` : undefined}
+            />
             <Stat label="Items sold" value={itemCount} />
             <Stat label="Avg. basket" value={money(Math.round(avg))} />
             <Stat label="Low stock" value={lowStock.length} />
           </div>
+          {hasCostGaps && (
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 14 }}>
+              Profit is a lower bound — some items sold have no recorded cost price yet.
+              Set one in Inventory or on the next restock to sharpen this number.
+            </p>
+          )}
 
           <div className="report-cols" style={{ marginTop: 14 }}>
             <section className="card">

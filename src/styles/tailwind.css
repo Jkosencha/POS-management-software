@@ -503,7 +503,7 @@
   .note       { @apply text-sm mt-3.5; }
 
   /* ---- reports stats grid ---- */
-  .stats { @apply grid grid-cols-2 md:grid-cols-4 gap-3; }
+  .stats { @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3; }
   .stat { @apply bg-surface border border-line rounded-md shadow-sm; padding: 18px; }
   .stat.big { @apply bg-sb-active-bg text-white border-transparent shadow-md; }
   .stat-label { @apply text-[11px] tracking-[.1em] uppercase text-muted font-bold; }

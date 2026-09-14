@@ -35,6 +35,16 @@ export default function ProductModal({ product, categories, onSave, onDeactivate
           <input type="number" min="0" value={f.price} onChange={set('price')} />
         </label>
         <label className="field">
+          <span>Cost price (KSh)</span>
+          <input type="number" min="0" value={f.cost_price ?? ''} onChange={set('cost_price')} placeholder="What you pay" />
+        </label>
+        <label className="field">
+          <span>Supplier</span>
+          <input value={f.supplier || ''} onChange={set('supplier')} placeholder="e.g. Metro Wholesalers" />
+        </label>
+      </div>
+      <div className="field-row">
+        <label className="field">
           <span>Stock on hand</span>
           <input type="number" min="0" value={f.stock} onChange={set('stock')} />
         </label>
@@ -55,6 +65,8 @@ export default function ProductModal({ product, categories, onSave, onDeactivate
           onClick={() => onSave({
             ...f,
             price: Number(f.price),
+            cost_price: f.cost_price === '' || f.cost_price == null ? null : Number(f.cost_price),
+            supplier: f.supplier?.trim() || null,
             stock: Number(f.stock),
             low_at: Number(f.low_at) || 5,
           })}
