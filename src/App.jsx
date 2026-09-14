@@ -1,4 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  LayoutDashboard, Package, Receipt, BarChart3, Users,
+  Settings as SettingsIcon, ShoppingCart, LogOut, Moon, Sun,
+} from 'lucide-react'
+import {
+  SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter,
+  SidebarGroup, SidebarGroupLabel, SidebarGroupContent,
+  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuBadge,
+  SidebarInset, SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { useSession } from './auth/useSession'
 import { supabase } from './lib/supabase'
 import { formatMoney } from './lib/money'
@@ -22,18 +32,18 @@ const DEFAULT_SETTINGS = {
 
 // Nav items per role group
 const ADMIN_NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◉' },
-  { key: 'inventory', label: 'Inventory', icon: '▤' },
-  { key: 'sales',     label: 'Sales',     icon: '≡' },
-  { key: 'reports',   label: 'Reports',   icon: '◔' },
-  { key: 'staff',     label: 'Staff',     icon: '◎', ownerOnly: true },
-  { key: 'settings',  label: 'Settings',  icon: '✦' },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'inventory', label: 'Inventory', icon: Package },
+  { key: 'sales',     label: 'Sales',     icon: Receipt },
+  { key: 'reports',   label: 'Reports',   icon: BarChart3 },
+  { key: 'staff',     label: 'Staff',     icon: Users, ownerOnly: true },
+  { key: 'settings',  label: 'Settings',  icon: SettingsIcon },
 ]
 
 const CASHIER_NAV = [
-  { key: 'register',  label: 'Register',  icon: '▦' },
-  { key: 'sales',     label: 'Sales',     icon: '≡' },
-  { key: 'settings',  label: 'Settings',  icon: '✦' },
+  { key: 'register',  label: 'Register',  icon: ShoppingCart },
+  { key: 'sales',     label: 'Sales',     icon: Receipt },
+  { key: 'settings',  label: 'Settings',  icon: SettingsIcon },
 ]
 
 export default function App() {
@@ -114,83 +124,120 @@ export default function App() {
   const isViewAllowed = navItems.some(n => n.key === view)
 
   return (
-    <div className="pos-root">
-      <nav className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">{settings.store_name.slice(0, 1)}</div>
-          <div className="brand-name">{settings.store_name}</div>
-        </div>
-
-        <div className="nav-section-label">{isAdmin ? 'Management' : 'Register'}</div>
-
-        {navItems.map(n => (
-          <button
-            key={n.key}
-            className={`nav-btn ${view === n.key ? 'active' : ''}`}
-            onClick={() => setView(n.key)}
-          >
-            <span className="nav-icon">{n.icon}</span>
-            {n.label}
-            {n.key === 'inventory' && lowStockCount > 0 && (
-              <span className="nav-badge">{lowStockCount}</span>
-            )}
-          </button>
-        ))}
-
-        <div className="sidebar-foot">
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            marginBottom: 12, paddingBottom: 12,
-            borderBottom: '1px solid var(--sb-line)', fontSize: 12,
-          }}>
-            <div style={{
-              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-              background: syncing ? '#d08828' : isOnline ? '#4caf50' : '#d08828',
-              boxShadow: isOnline && !syncing ? '0 0 0 2px rgba(76,175,80,.2)' : 'none',
-            }} />
-            <span style={{ color: syncing ? '#d08828' : isOnline ? '#6aaa7a' : '#d08828', fontSize: 12 }}>
-              {syncing ? 'Syncing…' : isOnline ? 'Online' : `Offline${pendingCount > 0 ? ` · ${pendingCount} queued` : ''}`}
-            </span>
-          </div>
-
-          <div className="foot-label">TODAY</div>
-          <div className="foot-value">{money(todayStats.total)}</div>
-          <div className="foot-sub">{todayStats.count} sale{todayStats.count === 1 ? '' : 's'}</div>
-        </div>
-
-        <div className="theme-toggle">
-          <span className="theme-toggle-label">{isDark ? '🌙 Dark' : '☀️ Light'}</span>
-          <button className={`toggle-track ${isDark ? 'on' : ''}`} onClick={toggleTheme} aria-label="Toggle dark mode">
-            <div className="toggle-thumb" />
-          </button>
-        </div>
-
-        <div className="sidebar-user">
-          <div className="user-avatar">
-            {(profile?.full_name || 'C').slice(0, 1).toUpperCase()}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ color: 'var(--sb-text)', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {profile?.full_name || 'User'}
+    <SidebarProvider className="bg-bg text-ink font-sans">
+      <Sidebar>
+        <SidebarHeader>
+          <div className="flex items-center gap-2.5 px-1 pt-1 pb-1">
+            <div className="w-9 h-9 rounded-[10px] shrink-0 flex items-center justify-center font-extrabold text-[17px] bg-sb-active-bg text-sb-active-fg shadow-sm">
+              <span>{settings.store_name.slice(0, 1)}</span>
             </div>
-            <div style={{ fontSize: 11, textTransform: 'capitalize', color: 'var(--sb-muted)' }}>{role}</div>
+            <div className="text-sb-text font-extrabold text-[13.5px] leading-tight tracking-tight">
+              {settings.store_name}
+            </div>
           </div>
-        </div>
+        </SidebarHeader>
 
-        <button className="signout-btn" onClick={signOut}>
-          <span className="nav-icon">⏻</span>
-          Sign out
-        </button>
-      </nav>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>{isAdmin ? 'Management' : 'Register'}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {navItems.map(n => {
+                  const Icon = n.icon
+                  return (
+                    <SidebarMenuItem key={n.key}>
+                      <SidebarMenuButton isActive={view === n.key} onClick={() => setView(n.key)}>
+                        <Icon size={16} />
+                        <span>{n.label}</span>
+                      </SidebarMenuButton>
+                      {n.key === 'inventory' && lowStockCount > 0 && (
+                        <SidebarMenuBadge className="bg-accent text-white rounded-full">
+                          {lowStockCount}
+                        </SidebarMenuBadge>
+                      )}
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
 
-      <main className="main">
+        <SidebarFooter>
+          <div className="border-t border-sb-line pt-3 px-1 pb-1 font-mono">
+            <div className="flex items-center gap-1.5 mb-3 pb-3 border-b border-sb-line text-xs">
+              <div
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{
+                  background: syncing ? '#d08828' : isOnline ? '#4caf50' : '#d08828',
+                  boxShadow: isOnline && !syncing ? '0 0 0 2px rgba(76,175,80,.2)' : 'none',
+                }}
+              />
+              <span className="text-xs" style={{ color: syncing ? '#d08828' : isOnline ? '#6aaa7a' : '#d08828' }}>
+                {syncing ? 'Syncing…' : isOnline ? 'Online' : `Offline${pendingCount > 0 ? ` · ${pendingCount} queued` : ''}`}
+              </span>
+            </div>
+
+            <div className="text-[10px] tracking-[.14em] text-sb-muted">TODAY</div>
+            <div className="text-xl font-bold mt-0.5 text-sb-text">{money(todayStats.total)}</div>
+            <div className="text-[11.5px] text-sb-muted mt-px">{todayStats.count} sale{todayStats.count === 1 ? '' : 's'}</div>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+
+      <SidebarInset className="bg-bg">
+        <header className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-line">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <span className="font-extrabold text-sm text-ink md:hidden">{settings.store_name}</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              className={`w-9.5 h-5 rounded-full relative shrink-0 transition-colors border-[1.5px] ${
+                isDark ? 'bg-accent border-accent' : 'bg-surface-2 border-line'
+              }`}
+              onClick={toggleTheme}
+              aria-label="Toggle dark mode"
+            >
+              <span className="sr-only">Toggle dark mode</span>
+              {isDark ? <Moon size={11} className="absolute top-1 left-1 text-white" /> : <Sun size={11} className="absolute top-1 right-1 text-muted" />}
+              <div
+                className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all"
+                style={{ left: isDark ? 22 : 2 }}
+              />
+            </button>
+
+            <div className="flex items-center gap-2">
+              <div className="w-7.5 h-7.5 rounded-full shrink-0 flex items-center justify-center text-xs font-bold bg-lavender-bg text-lavender-fg">
+                {(profile?.full_name || 'C').slice(0, 1).toUpperCase()}
+              </div>
+              <div className="min-w-0 hidden sm:block">
+                <div className="text-ink text-xs font-semibold overflow-hidden text-ellipsis whitespace-nowrap max-w-32">
+                  {profile?.full_name || 'User'}
+                </div>
+                <div className="text-[11px] capitalize text-muted">{role}</div>
+              </div>
+            </div>
+
+            <button
+              className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-muted hover:bg-surface-2 hover:text-ink transition-colors"
+              onClick={signOut}
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </header>
+
         {syncErrors.length > 0 && (
-          <div style={{
-            background: 'var(--red)', color: '#fff', padding: '10px 20px',
-            fontSize: 13, fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
+          <div className="bg-red text-white px-5 py-2.5 text-sm font-semibold flex justify-between items-center">
             {syncErrors.length} offline sale{syncErrors.length > 1 ? 's' : ''} failed to sync. Contact your manager.
-            <button onClick={() => setSyncErrors([])} style={{ background: 'rgba(255,255,255,.2)', border: 0, color: '#fff', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 700 }}>
+            <button
+              onClick={() => setSyncErrors([])}
+              className="bg-white/20 border-0 text-white rounded-md px-2.5 py-1 cursor-pointer font-bold"
+            >
               Dismiss
             </button>
           </div>
@@ -212,7 +259,7 @@ export default function App() {
         {isViewAllowed && view === 'reports'   && <Reports money={money} role={role} />}
         {isViewAllowed && view === 'staff'     && <Staff />}
         {isViewAllowed && view === 'settings'  && <Settings settings={settings} onSettingsChanged={setSettings} role={role} />}
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

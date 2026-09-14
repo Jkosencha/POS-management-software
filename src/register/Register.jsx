@@ -183,81 +183,120 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
   })
 
   return (
-    <div className="register">
-      <section className="picker">
+    <div className="register flex h-screen max-[900px]:flex-col max-[900px]:h-auto">
+      <section className="flex-1 min-w-0 p-5 max-[900px]:p-3.5 overflow-y-auto">
         {!isOnline && (
-          <div style={{
-            background: '#fff8ec', border: '1.5px solid var(--amber)', borderRadius: 8,
-            padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#7a5000', fontWeight: 600,
-          }}>
+          <div className="bg-amber-tint border-[1.5px] border-amber-warn rounded-lg px-3 py-2 mb-3 text-[13px] text-amber-text font-semibold">
             Offline mode — using cached products. Sales are queued and will sync automatically.
           </div>
         )}
         <input
-          className="search"
+          className="w-full border border-line rounded-[10px] bg-surface text-ink outline-none transition-colors focus:border-accent"
+          style={{
+            padding: '11px 14px 11px 40px',
+            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238990a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E\")",
+            backgroundRepeat: 'no-repeat', backgroundPosition: '13px center',
+          }}
           placeholder="Search by name or SKU…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="cats">
+        <div className="flex gap-1.75 flex-wrap my-3.5">
           {categories.map(c => (
-            <button key={c} className={`cat ${activeCat === c ? 'on' : ''}`} onClick={() => setActiveCat(c)}>
+            <button
+              key={c}
+              className={`border rounded-full py-1.25 px-3.5 text-[12.5px] font-semibold transition-all ${
+                activeCat === c ? 'bg-accent border-accent text-white' : 'border-line bg-surface text-muted hover:border-accent hover:text-accent'
+              }`}
+              onClick={() => setActiveCat(c)}
+            >
               {c}
             </button>
           ))}
         </div>
-        <div className="grid">
+        <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))' }}>
           {visibleProducts.map(p => (
             <button
               key={p.id}
-              className={`tile ${p.stock <= 0 ? 'out' : ''}`}
+              className={`bg-surface border border-line rounded-md text-left flex flex-col gap-2 min-h-[90px] shadow-sm transition-all hover:border-accent hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm ${p.stock <= 0 ? 'opacity-45 cursor-not-allowed' : ''}`}
+              style={{ padding: '14px 13px' }}
               onClick={() => addToCartDirect(p)}
             >
-              <div className="tile-name">{p.name}</div>
-              <div className="tile-meta">
-                <span className="tile-price">{money(p.price)}</span>
-                <span className={`tile-stock ${p.stock <= p.low_at ? 'low' : ''}`}>
+              <div className="font-semibold text-[13.5px] leading-[1.25] text-ink">{p.name}</div>
+              <div className="mt-auto flex justify-between items-baseline">
+                <span className="font-mono font-bold text-sm text-accent">{money(p.price)}</span>
+                <span className={`text-[11px] ${p.stock <= p.low_at ? 'text-amber-warn font-bold' : 'text-muted'}`}>
                   {p.stock <= 0 ? 'Out' : `${p.stock} left`}
                 </span>
               </div>
             </button>
           ))}
           {visibleProducts.length === 0 && (
-            <div className="empty-grid">No products match — try a different search or add it in Inventory.</div>
+            <div className="col-span-full py-12 px-2.5 text-center text-muted text-sm">
+              No products match — try a different search or add it in Inventory.
+            </div>
           )}
         </div>
       </section>
 
-      <aside className="receipt-cart">
-        <div className="rc-head">
+      <aside
+        className="receipt-cart w-[340px] max-[900px]:w-auto shrink-0 bg-surface shadow-md flex flex-col font-mono relative border border-line max-[900px]:rounded-md max-[900px]:max-h-none"
+        style={{
+          margin: '16px 16px 0 0', borderRadius: 'var(--r-md) var(--r-md) 0 0',
+          padding: '18px 18px 0', maxHeight: 'calc(100vh - 16px)', borderBottom: 0,
+        }}
+      >
+        <div className="flex justify-between text-[10.5px] tracking-[.08em] text-muted uppercase">
           <span>{settings.store_name.toUpperCase()}</span>
           <span>{new Date().toLocaleDateString('en-KE')}</span>
         </div>
-        <div className="rc-rule" />
-        <div className="rc-lines">
-          {cartLines.length === 0 && <div className="rc-empty">Tap products to ring them up</div>}
+        <hr className="border-0 border-t-[1.5px] border-dashed border-line my-2.5" />
+        <div className="flex-1 overflow-y-auto min-h-[60px]">
+          {cartLines.length === 0 && (
+            <div className="text-muted text-sm py-7 text-center font-mono">Tap products to ring them up</div>
+          )}
           {cartLines.map(l => (
-            <div key={l.productId} className="rc-line">
-              <div className="rc-line-top">
-                <span className="rc-name">{l.product.name}</span>
-                <span className="rc-amt">{money(l.line_total)}</span>
+            <div key={l.productId} className="py-2">
+              <div className="flex justify-between gap-2 text-sm font-medium text-ink">
+                <span>{l.product.name}</span>
+                <span className="whitespace-nowrap">{money(l.line_total)}</span>
               </div>
-              <div className="rc-line-ctl">
-                <button className="qty-btn" onClick={() => setQty(l.productId, l.qty - 1)}>−</button>
-                <span className="qty">{l.qty}</span>
-                <button className="qty-btn" onClick={() => setQty(l.productId, l.qty + 1)}>+</button>
-                <span className="rc-unit">@ {money(l.product.price)}</span>
-                <button className="rc-del" onClick={() => setQty(l.productId, 0)}>✕</button>
+              <div className="flex items-center gap-1.75 mt-1.25">
+                <button
+                  className="w-6 h-6 rounded-sm border-[1.5px] border-line bg-surface-2 text-ink text-[15px] leading-none font-bold transition-colors hover:border-accent hover:bg-accent-tint"
+                  onClick={() => setQty(l.productId, l.qty - 1)}
+                >
+                  −
+                </button>
+                <span className="min-w-5 text-center font-bold text-sm">{l.qty}</span>
+                <button
+                  className="w-6 h-6 rounded-sm border-[1.5px] border-line bg-surface-2 text-ink text-[15px] leading-none font-bold transition-colors hover:border-accent hover:bg-accent-tint"
+                  onClick={() => setQty(l.productId, l.qty + 1)}
+                >
+                  +
+                </button>
+                <span className="text-[11px] text-muted">@ {money(l.product.price)}</span>
+                <button
+                  className="ml-auto border-0 bg-transparent text-muted text-xs hover:text-red"
+                  style={{ padding: '2px 4px' }}
+                  onClick={() => setQty(l.productId, 0)}
+                >
+                  ✕
+                </button>
               </div>
             </div>
           ))}
         </div>
-        <div className="rc-rule" />
-        <div className="rc-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-        <div className="rc-row rc-discount">
+        <hr className="border-0 border-t-[1.5px] border-dashed border-line my-2.5" />
+        <div className="flex justify-between text-sm text-ink" style={{ padding: '3px 0' }}>
+          <span>Subtotal</span><span>{money(subtotal)}</span>
+        </div>
+        <div className="flex justify-between text-sm text-ink" style={{ padding: '3px 0' }}>
           <span>
             Discount{' '}
             <input
+              className="w-11 border border-line rounded-[5px] text-xs text-right bg-surface-2 text-ink outline-none focus:border-accent"
+              style={{ padding: '2px 4px', fontFamily: 'inherit' }}
               type="number" min="0" max="100" value={discountPct}
               onChange={e => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
             />
@@ -265,22 +304,44 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
           </span>
           <span>−{money(discountAmt)}</span>
         </div>
-        <div className="rc-row rc-total"><span>TOTAL</span><span>{money(total)}</span></div>
-        <div className="rc-row rc-vat">
+        <div className="flex justify-between text-xl font-bold text-accent" style={{ padding: '6px 0 2px' }}>
+          <span>TOTAL</span><span>{money(total)}</span>
+        </div>
+        <div className="flex justify-between text-muted text-[11.5px]">
           <span>VAT {settings.tax_rate}% (incl.)</span>
           <span>{money(vatIncluded.toFixed(2))}</span>
         </div>
-        <div className="rc-actions">
-          <button className="btn ghost" onClick={clearCart} disabled={!cartLines.length}>Clear</button>
+        <div className="flex gap-2.5" style={{ padding: '14px 0 18px' }}>
           <button
-            className="btn pay"
+            className={`border-0 rounded-[10px] font-bold text-sm bg-transparent border-[1.5px] border-line text-muted ${
+              !cartLines.length ? 'opacity-50 cursor-not-allowed' : 'hover:border-red hover:text-red'
+            }`}
+            style={{ padding: '11px 16px' }}
+            onClick={clearCart}
+            disabled={!cartLines.length}
+          >
+            Clear
+          </button>
+          <button
+            className="border-0 rounded-[10px] font-bold text-sm text-white flex-1 disabled:bg-surface-3 disabled:text-muted disabled:cursor-not-allowed disabled:shadow-none"
+            style={{
+              padding: '11px 16px',
+              background: (!cartLines.length || checkingOut) ? undefined : 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+              boxShadow: (!cartLines.length || checkingOut) ? undefined : '0 2px 8px rgba(184,150,58,.22), 0 4px 16px rgba(184,150,58,.14)',
+            }}
             onClick={() => cartLines.length && setPayOpen(true)}
             disabled={!cartLines.length || checkingOut}
           >
             Charge {money(total)}
           </button>
         </div>
-        <div className="rc-tear" />
+        <div
+          className="h-3 -mx-4.5 translate-y-3"
+          style={{
+            background:
+              'radial-gradient(circle at 6px 12px, var(--bg) 5px, transparent 5px) 0 0 / 12px 12px repeat-x, var(--surface)',
+          }}
+        />
       </aside>
 
       {payOpen && (
@@ -289,7 +350,13 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
       {receipt && (
         <ReceiptModal sale={receipt} settings={settings} money={money} onClose={() => setReceipt(null)} />
       )}
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="fixed left-1/2 bg-sb-bg text-sb-text rounded-xl font-semibold text-sm shadow-lg whitespace-nowrap z-[99]"
+          style={{ bottom: 24, transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,.1)', padding: '11px 22px' }}
+        >
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

@@ -142,12 +142,22 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
 
   // ---- render ----------------------------------------------------------
 
+  const fieldLabel = "text-xs font-bold text-muted uppercase tracking-[.06em]"
+  const fieldInput = "border-[1.5px] border-line rounded-sm bg-surface text-ink outline-none transition-all px-3 py-2.5 focus:border-accent"
+
   return (
     <Modal title="Take payment" onClose={onClose}>
-      <div className="pm-total">{money(total)}</div>
-      <div className="pm-methods">
+      <div className="font-mono text-4xl font-bold text-center text-accent" style={{ padding: '4px 0 16px' }}>{money(total)}</div>
+      <div className="flex gap-2 mb-4">
         {['Cash', 'M-Pesa', 'Card'].map(m => (
-          <button key={m} className={`pm-method ${method === m ? 'on' : ''}`} onClick={() => setMethod(m)}>
+          <button
+            key={m}
+            className={`flex-1 rounded-[10px] border-[1.5px] font-bold text-[13.5px] transition-all ${
+              method === m ? 'bg-accent-tint border-accent text-accent-text' : 'border-line bg-surface-2 text-ink-2 hover:border-accent hover:text-accent'
+            }`}
+            style={{ padding: 10 }}
+            onClick={() => setMethod(m)}
+          >
             {m}
           </button>
         ))}
@@ -155,9 +165,10 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
 
       {method === 'Cash' && (
         <>
-          <label className="field">
-            <span>Cash received</span>
+          <label className="flex flex-col gap-1.25 mb-3">
+            <span className={fieldLabel}>Cash received</span>
             <input
+              className={fieldInput}
               type="number"
               autoFocus
               value={tendered}
@@ -165,12 +176,19 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
               placeholder="0"
             />
           </label>
-          <div className="pm-quick">
+          <div className="flex gap-2 flex-wrap mb-2.5">
             {quick.map(q => (
-              <button key={q} onClick={() => setTendered(String(q))}>{money(q)}</button>
+              <button
+                key={q}
+                className="border-[1.5px] border-line bg-surface-2 rounded-sm font-mono text-[12.5px] font-semibold text-ink-2 transition-all hover:border-accent hover:text-accent hover:bg-accent-tint"
+                style={{ padding: '7px 12px' }}
+                onClick={() => setTendered(String(q))}
+              >
+                {money(q)}
+              </button>
             ))}
           </div>
-          <div className={`pm-change ${change < 0 ? 'short' : ''}`}>
+          <div className={`font-mono font-bold text-[17px] ${change < 0 ? 'text-red' : 'text-green'}`} style={{ padding: '4px 0' }}>
             {change >= 0 ? `Change: ${money(change)}` : `Short by ${money(-change)}`}
           </div>
         </>
@@ -182,9 +200,10 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
           {/* ---- idle: phone entry + send button ---- */}
           {(stkPhase === 'idle' || stkPhase === 'failed' || stkPhase === 'timeout') && (
             <>
-              <label className="field">
-                <span>Customer phone number</span>
+              <label className="flex flex-col gap-1.25 mb-3">
+                <span className={fieldLabel}>Customer phone number</span>
                 <input
+                  className={fieldInput}
                   autoFocus
                   type="tel"
                   value={phone}
@@ -195,7 +214,7 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
 
               {stkError && (
                 <div style={{
-                  background: '#fff0f0', border: '1.5px solid var(--red)',
+                  background: 'var(--red-tint)', border: '1.5px solid var(--red)',
                   borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--red)',
                 }}>
                   {stkError}
@@ -203,7 +222,12 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
               )}
 
               <button
-                className="btn pay wide"
+                className="border-0 rounded-[10px] font-bold text-sm text-white w-full disabled:bg-surface-3 disabled:text-muted disabled:cursor-not-allowed"
+                style={{
+                  padding: '11px 16px',
+                  background: phone.replace(/\D/g, '').length < 9 ? undefined : 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                  boxShadow: phone.replace(/\D/g, '').length < 9 ? undefined : '0 2px 8px rgba(184,150,58,.22), 0 4px 16px rgba(184,150,58,.14)',
+                }}
                 disabled={phone.replace(/\D/g, '').length < 9}
                 onClick={sendStk}
               >
@@ -213,9 +237,10 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
               <div style={{ textAlign: 'center', color: '#8d948a', fontSize: 12 }}>
                 or enter reference manually:
               </div>
-              <label className="field">
-                <span>M-Pesa reference</span>
+              <label className="flex flex-col gap-1.25 mb-3">
+                <span className={fieldLabel}>M-Pesa reference</span>
                 <input
+                  className={fieldInput}
                   value={ref}
                   onChange={e => setRef(e.target.value)}
                   placeholder="e.g. RKT4XYZ123"
@@ -284,14 +309,21 @@ export default function PaymentModal({ total, money, session, onClose, onComplet
       )}
 
       {method === 'Card' && (
-        <p className="pm-note">Process the card on your terminal, then confirm here.</p>
+        <p className="text-muted text-sm m-0" style={{ padding: '12px 0' }}>
+          Process the card on your terminal, then confirm here.
+        </p>
       )}
 
       {/* Bottom confirm — only shown when not in STK flow */}
       {(method !== 'M-Pesa' || stkPhase === 'idle' || stkPhase === 'failed' || stkPhase === 'timeout') && (
         <button
-          className="btn pay wide"
-          style={{ marginTop: method === 'M-Pesa' ? 0 : 12 }}
+          className="border-0 rounded-[10px] font-bold text-sm text-white w-full disabled:bg-surface-3 disabled:text-muted disabled:cursor-not-allowed"
+          style={{
+            padding: '11px 16px',
+            marginTop: method === 'M-Pesa' ? 0 : 12,
+            background: !canConfirm ? undefined : 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+            boxShadow: !canConfirm ? undefined : '0 2px 8px rgba(184,150,58,.22), 0 4px 16px rgba(184,150,58,.14)',
+          }}
           disabled={!canConfirm}
           onClick={() => onComplete({
             method,

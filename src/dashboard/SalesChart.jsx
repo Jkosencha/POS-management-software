@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
 
 function fmtAxis(v) {
@@ -21,6 +22,21 @@ function buildDays(n) {
     })
   }
   return days
+}
+
+const BAR_COLORS = [
+  'var(--pastel-mint-fg)', 'var(--pastel-teal-fg)', 'var(--pastel-lavender-fg)',
+  'var(--pastel-coral-fg)', 'var(--accent)',
+]
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-surface border border-line rounded-md shadow-md px-3 py-2 text-xs">
+      <div className="text-muted mb-0.5">{label}</div>
+      <div className="font-mono font-bold">KSh {payload[0].value.toLocaleString('en-KE')}</div>
+    </div>
+  )
 }
 
 export default function SalesChart() {
@@ -60,62 +76,31 @@ export default function SalesChart() {
     return () => { cancelled = true }
   }, [period])
 
-  /* ---- SVG layout ---- */
-  const W = 580, H = 160
-  const PL = 50, PR = 14, PT = 12, PB = 38
-  const pw = W - PL - PR
-  const ph = H - PT - PB
-
-  const maxR = Math.max(...data.map(d => d.revenue), 1)
-  const cx   = i => PL + (i / Math.max(data.length - 1, 1)) * pw
-  const cy   = v => PT + ph - (v / maxR) * ph * 0.92
-
-  const pts      = data.map((d, i) => [cx(i), cy(d.revenue)])
-  const linePath = data.length > 1
-    ? pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-    : ''
-  const fillPath = data.length > 1
-    ? `M${pts[0][0].toFixed(1)},${(PT + ph).toFixed(1)} ` +
-      pts.map(([x, y]) => `L${x.toFixed(1)},${y.toFixed(1)}`).join(' ') +
-      ` L${pts[pts.length - 1][0].toFixed(1)},${(PT + ph).toFixed(1)}Z`
-    : ''
-
-  const yTicks = [0, Math.round(maxR / 2), maxR]
-  const xStep  = data.length <= 10 ? 1 : 5
   const totalRevenue = data.reduce((n, d) => n + d.revenue, 0)
 
   return (
     <div>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        marginBottom: 18,
-      }}>
+      <div className="flex justify-between items-start mb-4.5">
         <div>
-          <h3 style={{ margin: '0 0 3px', fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>
-            Revenue trend
-          </h3>
+          <h3 className="m-0 mb-0.5 text-sm font-extrabold text-ink">Revenue trend</h3>
           {!loading && (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+            <div className="text-xs text-muted">
               {totalRevenue === 0
                 ? 'No sales in this period'
                 : `KSh ${totalRevenue.toLocaleString('en-KE')} total · ${period} days`}
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="flex gap-1">
           {[['7', '7 days'], ['30', '30 days']].map(([v, label]) => (
             <button
               key={v}
               onClick={() => setPeriod(v)}
-              style={{
-                padding: '5px 13px', borderRadius: 8,
-                fontSize: 12, fontWeight: 600,
-                border: `1.5px solid ${period === v ? 'rgba(184,150,58,.35)' : 'var(--line)'}`,
-                background: period === v ? 'var(--accent-tint)' : 'transparent',
-                color: period === v ? 'var(--accent-text)' : 'var(--muted)',
-                cursor: 'pointer', fontFamily: 'var(--font-ui)',
-                transition: 'all .12s ease',
-              }}
+              className={`px-3.5 py-1.5 rounded-sm text-xs font-semibold border-[1.5px] transition-all ${
+                period === v
+                  ? 'border-accent/35 bg-accent-tint text-accent-text'
+                  : 'border-line bg-transparent text-muted hover:bg-surface-2'
+              }`}
             >
               {label}
             </button>
@@ -124,77 +109,34 @@ export default function SalesChart() {
       </div>
 
       {loading ? (
-        <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-          Loading chart…
-        </div>
+        <div className="h-40 flex items-center justify-center text-muted text-sm">Loading chart…</div>
       ) : totalRevenue === 0 ? (
-        <div style={{ height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, fontStyle: 'italic' }}>
+        <div className="h-40 flex items-center justify-center text-muted text-sm italic">
           No completed sales in this period
         </div>
       ) : (
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          style={{ width: '100%', height: 'auto', display: 'block', color: 'var(--muted)' }}
-          overflow="visible"
-        >
-          <defs>
-            <linearGradient id="sg-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="var(--accent)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
-          {/* Grid + Y labels */}
-          {yTicks.map((v, i) => (
-            <React.Fragment key={i}>
-              <line
-                x1={PL} x2={PL + pw} y1={cy(v)} y2={cy(v)}
-                stroke="currentColor"
-                strokeOpacity={i === 0 ? '0.2' : '0.1'}
-                strokeWidth="1"
-                strokeDasharray={i === 0 ? undefined : '4 4'}
-              />
-              <text x={PL - 6} y={cy(v) + 4} textAnchor="end" fontSize="10" fill="currentColor">
-                {fmtAxis(v)}
-              </text>
-            </React.Fragment>
-          ))}
-
-          {/* Area fill */}
-          {fillPath && <path d={fillPath} fill="url(#sg-grad)" />}
-
-          {/* Line */}
-          {linePath && (
-            <path
-              d={linePath} fill="none"
-              stroke="var(--accent)" strokeWidth="2.5"
-              strokeLinecap="round" strokeLinejoin="round"
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 4" />
+            <XAxis
+              dataKey="label" tickLine={false} axisLine={false}
+              tick={{ fontSize: 10, fill: 'var(--muted)' }}
+              interval={data.length > 10 ? 4 : 0}
             />
-          )}
-
-          {/* Data points */}
-          {data.map((d, i) => d.revenue > 0 && (
-            <circle key={i}
-              cx={cx(i)} cy={cy(d.revenue)} r="3.5"
-              fill="var(--surface)" stroke="var(--accent)" strokeWidth="2"
+            <YAxis
+              tickLine={false} axisLine={false}
+              tick={{ fontSize: 10, fill: 'var(--muted)' }}
+              tickFormatter={fmtAxis}
+              width={40}
             />
-          ))}
-
-          {/* X labels */}
-          {data
-            .filter((_, i) => i % xStep === 0 || i === data.length - 1)
-            .map(d => {
-              const i = data.indexOf(d)
-              return (
-                <text key={d.date}
-                  x={cx(i)} y={H - 4}
-                  textAnchor="middle" fontSize="10" fill="currentColor"
-                >
-                  {d.label}
-                </text>
-              )
-            })}
-        </svg>
+            <Tooltip cursor={{ fill: 'var(--surface-2)' }} content={<ChartTooltip />} />
+            <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={28}>
+              {data.map((d, i) => (
+                <Cell key={d.date} fill={BAR_COLORS[i % BAR_COLORS.length]} opacity={d.revenue > 0 ? 1 : 0.15} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       )}
     </div>
   )

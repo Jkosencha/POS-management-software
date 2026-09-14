@@ -1,0 +1,688 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Cormorant+Garamond:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * shadcn/ui components (Sidebar etc.) look for the "dark" variant via a
+ * [data-theme="dark"] ancestor instead of a ".dark" class, so they follow
+ * the exact same toggle useTheme.js already drives — no second dark-mode
+ * mechanism to keep in sync.
+ */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/* ================================================================
+   DESIGN TOKENS (raw values)
+   Light, card-based SaaS look. Sidebar follows theme; the active
+   nav item is always a fixed dark pill for brand consistency.
+   ================================================================ */
+:root {
+  --font-ui:      'Archivo', system-ui, sans-serif;
+  --font-serif:   'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-mono:    'IBM Plex Mono', 'Courier New', monospace;
+
+  /* Muted antique gold — brand accent */
+  --accent:        #b8963a;
+  --accent-hover:  #97782c;
+  --accent-tint:   #faf4e2;
+  --accent-text:   #6a5020;
+
+  /* Olive */
+  --olive:         #5c6b2a;
+  --olive-tint:    #edf2e0;
+
+  /* Cool, light neutral surfaces */
+  --bg:        #f3f5f9;
+  --surface:   #ffffff;
+  --surface-2: #f0f2f7;
+  --surface-3: #e6e9f0;
+
+  --ink:   #1a2033;
+  --ink-2: #4a5170;
+  --muted: #8990a6;
+  --line:  #e6e8f0;
+
+  /* Semantic */
+  --red:        #d0483f;
+  --red-tint:   #fdedec;
+  --green:      #2f9e63;
+  --green-dark: #1f7a4c;
+  --green-tint: #e4f7ec;
+  --amber-warn: #c08a10;
+  --amber-tint: #fdf3de;
+  --amber-text: #7a5000;
+
+  /* Pastel stat-card palette (reference-style dashboard cards) */
+  --pastel-mint-bg:   #dff5e6;
+  --pastel-mint-fg:   #1f8a4c;
+  --pastel-teal-bg:   #dcf3f1;
+  --pastel-teal-fg:   #1a8f83;
+  --pastel-coral-bg:  #fbe4e8;
+  --pastel-coral-fg:  #d3475f;
+  --pastel-lavender-bg: #e9e6fb;
+  --pastel-lavender-fg: #6d5adb;
+
+  /* Sidebar — follows theme surfaces; active item is a fixed dark pill */
+  --sb-bg:      var(--surface);
+  --sb-surface: var(--surface-2);
+  --sb-hover:   var(--surface-2);
+  --sb-text:    var(--ink);
+  --sb-muted:   var(--muted);
+  --sb-line:    var(--line);
+  --sb-active-bg: #16281d;
+  --sb-active-fg: #f3ead0;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(30,41,59,.04), 0 2px 8px rgba(30,41,59,.05);
+  --shadow-md: 0 2px 8px rgba(30,41,59,.05), 0 10px 28px rgba(30,41,59,.08);
+  --shadow-lg: 0 4px 20px rgba(30,41,59,.08), 0 24px 56px rgba(30,41,59,.14);
+
+  /* Radii */
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --background:      oklch(1 0 0);
+  --foreground:      oklch(0.145 0 0);
+  --card:      oklch(1 0 0);
+  --card-foreground:      oklch(0.145 0 0);
+  --popover:      oklch(1 0 0);
+  --popover-foreground:      oklch(0.145 0 0);
+  --primary:      oklch(0.205 0 0);
+  --primary-foreground:      oklch(0.985 0 0);
+  --secondary:      oklch(0.97 0 0);
+  --secondary-foreground:      oklch(0.205 0 0);
+  --muted-foreground:      oklch(0.556 0 0);
+  --accent-foreground:      oklch(0.205 0 0);
+  --destructive:      oklch(0.577 0.245 27.325);
+  --border:      oklch(0.922 0 0);
+  --input:      oklch(0.922 0 0);
+  --ring:      oklch(0.708 0 0);
+  --chart-1:      oklch(0.87 0 0);
+  --chart-2:      oklch(0.556 0 0);
+  --chart-3:      oklch(0.439 0 0);
+  --chart-4:      oklch(0.371 0 0);
+  --chart-5:      oklch(0.269 0 0);
+  --radius:      0.625rem;
+  /* Sidebar (shadcn) — follows the app's own --sb-* tokens so the
+     shadcn Sidebar component matches the brand instead of shadcn's
+     default neutral palette, and inherits light/dark theming for free. */
+  --sidebar:      var(--sb-bg);
+  --sidebar-foreground:      var(--sb-text);
+  --sidebar-primary:      var(--sb-active-bg);
+  --sidebar-primary-foreground:      var(--sb-active-fg);
+  --sidebar-accent:      var(--sb-active-bg);
+  --sidebar-accent-foreground:      var(--sb-active-fg);
+  --sidebar-border:      var(--sb-line);
+  --sidebar-ring:      var(--accent);
+}
+
+/* --- auto dark (system preference) -------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accent:        #c9a84c;
+    --accent-hover:  #dabb5c;
+    --accent-tint:   #241d0c;
+    --accent-text:   #f0d080;
+
+    --bg:        #0e1015;
+    --surface:   #161922;
+    --surface-2: #1e222c;
+    --surface-3: #272c38;
+
+    --ink:   #eaecf3;
+    --ink-2: #b7bccb;
+    --muted: #7d8398;
+    --line:  #2a2e3a;
+
+    --green:      #4cbf85;
+    --green-dark: #2f9e63;
+    --green-tint: #123423;
+    --red-tint:   #331414;
+    --amber-tint: #332608;
+    --amber-text: #e0b969;
+
+    --pastel-mint-bg:   #123423;
+    --pastel-mint-fg:   #57d497;
+    --pastel-teal-bg:   #0f3230;
+    --pastel-teal-fg:   #4fd0c4;
+    --pastel-coral-bg:  #391a20;
+    --pastel-coral-fg:  #f0879a;
+    --pastel-lavender-bg: #241f3d;
+    --pastel-lavender-fg: #a99cf7;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.20), 0 3px 10px rgba(0,0,0,.22);
+    --shadow-md: 0 2px 8px rgba(0,0,0,.28), 0 8px 28px rgba(0,0,0,.32);
+    --shadow-lg: 0 4px 20px rgba(0,0,0,.36), 0 20px 56px rgba(0,0,0,.52);
+  }
+}
+
+/* --- manual dark override ----------------------------------------- */
+[data-theme="dark"] {
+  --accent:        #c9a84c;
+  --accent-hover:  #dabb5c;
+  --accent-tint:   #241d0c;
+  --accent-text:   #f0d080;
+
+  --bg:        #0e1015;
+  --surface:   #161922;
+  --surface-2: #1e222c;
+  --surface-3: #272c38;
+
+  --ink:   #eaecf3;
+  --ink-2: #b7bccb;
+  --muted: #7d8398;
+  --line:  #2a2e3a;
+
+  --green:      #4cbf85;
+  --green-dark: #2f9e63;
+  --green-tint: #123423;
+  --red-tint:   #331414;
+
+  --pastel-mint-bg:   #123423;
+  --pastel-mint-fg:   #57d497;
+  --pastel-teal-bg:   #0f3230;
+  --pastel-teal-fg:   #4fd0c4;
+  --pastel-coral-bg:  #391a20;
+  --pastel-coral-fg:  #f0879a;
+  --pastel-lavender-bg: #241f3d;
+  --pastel-lavender-fg: #a99cf7;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.20), 0 3px 10px rgba(0,0,0,.22);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.28), 0 8px 28px rgba(0,0,0,.32);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.36), 0 20px 56px rgba(0,0,0,.52);
+}
+
+[data-theme="light"] {
+  --accent:        #b8963a;
+  --accent-hover:  #97782c;
+  --accent-tint:   #faf4e2;
+  --accent-text:   #6a5020;
+
+  --bg:        #f3f5f9;
+  --surface:   #ffffff;
+  --surface-2: #f0f2f7;
+  --surface-3: #e6e9f0;
+
+  --ink:   #1a2033;
+  --ink-2: #4a5170;
+  --muted: #8990a6;
+  --line:  #e6e8f0;
+
+  --green:      #2f9e63;
+  --green-dark: #1f7a4c;
+  --green-tint: #e4f7ec;
+  --red-tint:   #fdedec;
+  --amber-tint: #fdf3de;
+  --amber-text: #7a5000;
+
+  --pastel-mint-bg:   #dff5e6;
+  --pastel-mint-fg:   #1f8a4c;
+  --pastel-teal-bg:   #dcf3f1;
+  --pastel-teal-fg:   #1a8f83;
+  --pastel-coral-bg:  #fbe4e8;
+  --pastel-coral-fg:  #d3475f;
+  --pastel-lavender-bg: #e9e6fb;
+  --pastel-lavender-fg: #6d5adb;
+
+  --shadow-sm: 0 1px 2px rgba(30,41,59,.04), 0 2px 8px rgba(30,41,59,.05);
+  --shadow-md: 0 2px 8px rgba(30,41,59,.05), 0 10px 28px rgba(30,41,59,.08);
+  --shadow-lg: 0 4px 20px rgba(30,41,59,.08), 0 24px 56px rgba(30,41,59,.14);
+}
+
+/*
+ * Bridges Tailwind utilities to the design tokens above. Each entry
+ * points at the runtime CSS variable (--bg, --surface, --pastel-mint-fg,
+ * etc.) instead of a static value, so classes like bg-surface / text-ink
+ * / rounded-lg automatically follow the same light/dark/system theming
+ * defined above — nothing about theme switching needs to be duplicated
+ * in the @theme block itself.
+ */
+@theme {
+  --font-sans:  'Archivo', system-ui, sans-serif;
+  --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-mono:  'IBM Plex Mono', 'Courier New', monospace;
+
+  --color-bg:        var(--bg);
+  --color-surface:   var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-ink:   var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line:  var(--line);
+
+  --color-accent:       var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-tint:  var(--accent-tint);
+  --color-accent-text:  var(--accent-text);
+
+  --color-olive:      var(--olive);
+  --color-olive-tint: var(--olive-tint);
+
+  --color-red:        var(--red);
+  --color-red-tint:   var(--red-tint);
+  --color-green:      var(--green);
+  --color-green-dark: var(--green-dark);
+  --color-green-tint: var(--green-tint);
+  --color-amber-warn: var(--amber-warn);
+  --color-amber-tint: var(--amber-tint);
+  --color-amber-text: var(--amber-text);
+
+  --color-mint-bg:      var(--pastel-mint-bg);
+  --color-mint-fg:      var(--pastel-mint-fg);
+  --color-teal-bg:      var(--pastel-teal-bg);
+  --color-teal-fg:      var(--pastel-teal-fg);
+  --color-coral-bg:     var(--pastel-coral-bg);
+  --color-coral-fg:     var(--pastel-coral-fg);
+  --color-lavender-bg:  var(--pastel-lavender-bg);
+  --color-lavender-fg:  var(--pastel-lavender-fg);
+
+  --color-sb-bg:        var(--sb-bg);
+  --color-sb-surface:   var(--sb-surface);
+  --color-sb-hover:     var(--sb-hover);
+  --color-sb-text:      var(--sb-text);
+  --color-sb-muted:     var(--sb-muted);
+  --color-sb-line:      var(--sb-line);
+  --color-sb-active-bg: var(--sb-active-bg);
+  --color-sb-active-fg: var(--sb-active-fg);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/*
+ * Component classes below back the app's existing semantic class names
+ * (.btn, .field, .modal, .table, ...) with @apply so every value still
+ * comes from Tailwind's utility/token system, without having to rewrite
+ * every page's JSX to inline utility strings. Pseudo-class combinations,
+ * gradients, and decorative CSS that don't map cleanly to @apply are
+ * left as plain declarations, still referencing the same CSS variables.
+ */
+@layer components {
+  .loading-screen { @apply min-h-screen grid place-items-center font-mono text-muted text-sm; }
+
+  /* ---- login ---- */
+  .login-screen {
+    @apply min-h-screen grid place-items-center bg-bg;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 15% 85%, rgba(47,158,99,.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 85% 15%, rgba(184,150,58,.07) 0%, transparent 60%);
+  }
+  .login-card { @apply bg-surface border border-line rounded-lg shadow-md w-full max-w-[390px] py-10 px-9; }
+  .login-brand { @apply flex flex-col items-center gap-2.5 mb-8; }
+  .login-brand .brand-mark { @apply w-14 h-14 rounded-md flex items-center justify-center font-extrabold text-[28px] shadow-md bg-sb-active-bg text-sb-active-fg; }
+  .login-brand h1 { @apply m-0 text-[22px] font-extrabold text-ink tracking-tight; }
+  .login-brand p { @apply m-0 text-[13px] text-muted; }
+  .login-error { @apply bg-red-tint border border-red/25 rounded-sm px-3 py-2.5 mb-3.5 text-sm text-red; }
+
+  /* ---- register ---- */
+  .register { @apply flex h-screen max-[900px]:flex-col max-[900px]:h-auto; }
+  .picker { @apply flex-1 min-w-0 p-5 max-[900px]:p-3.5; }
+  .search {
+    @apply w-full border border-line rounded-[10px] bg-surface text-ink outline-none transition-colors;
+    padding: 11px 14px 11px 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238990a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 13px center;
+  }
+  .search:focus { @apply border-accent; box-shadow: 0 0 0 3px rgba(184,150,58,.12); }
+  .search::placeholder { @apply text-muted; }
+
+  .cats { @apply flex gap-1.75 flex-wrap my-3.5; }
+  .cat { @apply border border-line bg-surface rounded-full py-1.25 px-3.5 text-[12.5px] font-semibold text-muted transition-all; }
+  .cat:hover { @apply border-accent text-accent; }
+  .cat.on { @apply bg-accent border-accent text-white; }
+
+  .product-grid {
+    @apply grid gap-2.5;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  }
+
+  .tile { @apply bg-surface border border-line rounded-md py-3.5 px-[13px] text-left flex flex-col gap-2 min-h-[90px] shadow-sm transition-all; }
+  .tile:hover { @apply border-accent -translate-y-0.5; box-shadow: 0 6px 24px rgba(184,150,58,.15), 0 2px 6px rgba(0,0,0,.06); }
+  .tile:active { @apply translate-y-0 shadow-sm; }
+  .tile.out { @apply opacity-45 cursor-not-allowed; }
+  .tile-name { @apply font-semibold text-[13.5px] leading-[1.25] text-ink; }
+  .tile-meta { @apply mt-auto flex justify-between items-baseline; }
+  .tile-price { @apply font-mono font-bold text-sm text-accent; }
+  .tile-stock { @apply text-[11px] text-muted; }
+  .tile-stock.low { @apply text-amber-warn font-bold; }
+  .tile-cat { @apply text-[10px] font-bold tracking-[.08em] uppercase text-muted opacity-70; }
+  .empty-grid { @apply col-span-full py-12 px-2.5 text-center text-muted text-sm; }
+
+  /* ---- receipt cart panel ---- */
+  .receipt-cart {
+    @apply w-[340px] shrink-0 bg-surface shadow-md flex flex-col font-mono relative border border-line max-[900px]:w-auto max-[900px]:max-h-none max-[900px]:rounded-md max-[900px]:border max-[900px]:m-0;
+    margin: 16px 16px 0 0;
+    border-radius: var(--r-md) var(--r-md) 0 0;
+    padding: 18px 18px 0;
+    max-height: calc(100vh - 16px);
+    border-bottom: 0;
+  }
+  @media (max-width: 900px) {
+    .receipt-cart { margin: 0 14px 24px; padding: 18px; }
+  }
+  .rc-head { @apply flex justify-between text-[10.5px] tracking-[.08em] text-muted uppercase; }
+  .rc-rule { @apply border-0 border-t-[1.5px] border-dashed border-line my-2.5; }
+  .rc-lines { @apply flex-1 overflow-y-auto min-h-[60px]; }
+  .rc-empty { @apply text-muted text-sm py-7 text-center font-mono; }
+  .rc-line { @apply py-2; }
+  .rc-line-top { @apply flex justify-between gap-2 text-sm font-medium text-ink; }
+  .rc-amt { @apply whitespace-nowrap; }
+  .rc-line-ctl { @apply flex items-center gap-1.75 mt-1.25; }
+  .qty-btn { @apply w-6 h-6 rounded-sm border-[1.5px] border-line bg-surface-2 text-ink text-[15px] leading-none font-bold transition-colors; }
+  .qty-btn:hover { @apply border-accent bg-accent-tint; }
+  .qty { @apply min-w-5 text-center font-bold text-sm; }
+  .rc-unit { @apply text-[11px] text-muted; }
+  .rc-del { @apply ml-auto border-0 bg-transparent text-muted text-xs; padding: 2px 4px; }
+  .rc-del:hover { @apply text-red; }
+  .rc-row { @apply flex justify-between text-sm text-ink; padding: 3px 0; }
+  .rc-discount input { @apply w-11 border border-line rounded-[5px] text-xs text-right bg-surface-2 text-ink outline-none; padding: 2px 4px; font-family: inherit; }
+  .rc-discount input:focus { @apply border-accent; }
+  .rc-total { @apply text-xl font-bold text-accent; padding: 6px 0 2px; }
+  .rc-vat { @apply text-muted text-[11.5px]; }
+  .rc-actions { @apply flex gap-2.5; padding: 14px 0 18px; }
+  .rc-tear {
+    height: 12px; margin: 0 -18px;
+    background:
+      radial-gradient(circle at 6px 12px, var(--bg) 5px, transparent 5px) 0 0 / 12px 12px repeat-x,
+      var(--surface);
+    transform: translateY(12px);
+  }
+
+  /* ---- buttons ---- */
+  .btn { @apply border-0 rounded-[10px] font-bold text-sm font-sans transition-all; padding: 11px 16px; }
+  .btn.pay {
+    @apply text-white bg-linear-to-br from-accent to-accent-hover;
+    box-shadow: 0 2px 8px rgba(184,150,58,.22), 0 4px 16px rgba(184,150,58,.14);
+  }
+  .rc-actions .btn.pay { @apply flex-1; }
+  .btn.pay:hover { @apply from-accent-hover; --tw-gradient-to: #7a5e18; }
+  .btn.pay:active { @apply scale-[.98]; }
+  .btn.pay:disabled { @apply bg-surface-3 text-muted cursor-not-allowed shadow-none; }
+  .btn.ghost { @apply bg-transparent border-[1.5px] border-line text-muted; }
+  .btn.ghost:hover:not(:disabled) { @apply border-red text-red; }
+  .btn.ghost:disabled { @apply opacity-50 cursor-not-allowed; }
+  .btn.danger { @apply bg-transparent border-[1.5px] border-red text-red; }
+  .btn.danger:hover { @apply bg-red-tint; }
+  .btn.secondary { @apply bg-surface-2 border-[1.5px] border-line text-ink-2; }
+  .btn.secondary:hover { @apply border-accent text-accent; }
+  .btn.wide { @apply w-full mt-3.5; }
+  .link { @apply bg-transparent border-0 text-accent font-bold text-[13.5px]; }
+  .link:hover { @apply underline; }
+
+  /* ---- form fields ---- */
+  .field { @apply flex flex-col gap-1.25 mb-3 flex-1; }
+  .field > span { @apply text-xs font-bold text-muted uppercase tracking-[.06em]; }
+  .field input, .field select, .field textarea {
+    @apply border-[1.5px] border-line rounded-sm bg-surface text-ink outline-none transition-all;
+    padding: 10px 12px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    @apply border-accent;
+    box-shadow: 0 0 0 3px rgba(184,150,58,.12);
+  }
+  .field input:disabled { @apply bg-surface-2 text-muted cursor-not-allowed; }
+  .field-row { @apply flex gap-2.5; }
+
+  /* ---- modals ---- */
+  .overlay {
+    @apply fixed inset-0 grid place-items-center p-5;
+    background: rgba(10,6,2,.52);
+    backdrop-filter: blur(3px);
+    z-index: 50;
+  }
+  .modal { @apply bg-surface border border-line rounded-lg w-full max-w-[420px] max-h-[90vh] overflow-y-auto shadow-lg; padding: 24px 24px 20px; }
+  .modal-head { @apply flex justify-between items-center mb-4; }
+  .modal-head h2 { @apply m-0 text-lg font-extrabold text-ink; }
+  .x { @apply border-0 bg-transparent text-lg text-muted w-7.5 h-7.5 rounded-sm grid place-items-center transition-all; }
+  .x:hover { @apply bg-surface-2 text-ink; }
+  .modal-actions { @apply flex gap-2.5 mt-2; }
+  .modal-actions .btn.pay { @apply flex-1; }
+
+  /* ---- payment modal ---- */
+  .pm-total { @apply font-mono text-4xl font-bold text-center text-accent; padding: 4px 0 16px; }
+  .pm-methods { @apply flex gap-2 mb-4; }
+  .pm-method { @apply flex-1 rounded-[10px] border-[1.5px] border-line bg-surface-2 text-ink-2 font-bold text-[13.5px] transition-all; padding: 10px; }
+  .pm-method:hover { @apply border-accent text-accent; }
+  .pm-method.on { @apply bg-accent-tint border-accent text-accent-text; }
+  .pm-quick { @apply flex gap-2 flex-wrap mb-2.5; }
+  .pm-quick button { @apply border-[1.5px] border-line bg-surface-2 rounded-sm font-mono text-[12.5px] font-semibold text-ink-2 transition-all; padding: 7px 12px; }
+  .pm-quick button:hover { @apply border-accent text-accent bg-accent-tint; }
+  .pm-change { @apply font-mono font-bold text-[17px] text-green; padding: 4px 0; }
+  .pm-change.short { @apply text-red; }
+  .pm-note { @apply text-muted text-sm m-0; padding: 12px 0; }
+
+  /* ---- receipt paper (modal + print) ---- */
+  .receipt-paper { @apply font-mono bg-white text-[#111] border border-line rounded-sm p-4; }
+  .rp-store { @apply text-center font-bold text-[14.5px] tracking-[.12em]; }
+  .rp-meta { @apply text-center text-[11px] text-[#666] mt-0.75; }
+  .rp-footer { @apply text-center text-xs text-[#666] pt-1; }
+
+  /* ---- toast ---- */
+  .toast {
+    @apply fixed left-1/2 bg-sb-bg text-sb-text rounded-xl font-semibold text-sm shadow-lg whitespace-nowrap;
+    bottom: 24px; transform: translateX(-50%);
+    border: 1px solid rgba(255,255,255,.1);
+    padding: 11px 22px; z-index: 99;
+  }
+
+  /* ---- generic page layout ---- */
+  .page { @apply max-w-[1040px]; padding: 24px 28px; }
+  .page.narrow { @apply max-w-[560px]; }
+  .page-head { @apply flex justify-between items-center mb-5; }
+  .page-head h1 { @apply text-[22px] font-extrabold m-0 tracking-tight text-ink; }
+
+  /* ---- table ---- */
+  .table { @apply mt-4 bg-surface border border-line rounded-md overflow-hidden shadow-sm; }
+  .tr {
+    @apply gap-2.5 border-t border-line items-center text-sm transition-colors;
+    display: grid;
+    grid-template-columns: 22fr 10fr 12fr 10fr 8fr 7fr;
+    padding: 12px 16px;
+  }
+  .tr:first-child { @apply border-t-0; }
+  .tr:not(.th):hover { @apply bg-surface-2; }
+  .tr.th { @apply text-[11px] tracking-[.1em] uppercase text-muted bg-surface-2 font-bold; }
+  .tr.row-low  { background: rgba(192,138,16,.06); }
+  .tr.row-zero { background: rgba(181,60,46,.06); }
+  @media (max-width: 900px) {
+    .tr { grid-template-columns: 18fr 10fr 8fr 6fr; }
+    .tr > *:nth-child(2), .tr > *:nth-child(3) { display: none; }
+  }
+  .num   { @apply text-right font-mono; }
+  .mono  { @apply font-mono text-[13px]; }
+  .stock-low  { @apply text-amber-warn font-bold; }
+  .row-act    { @apply text-right; }
+  .muted      { @apply text-muted; }
+  .note       { @apply text-sm mt-3.5; }
+
+  /* ---- reports stats grid ---- */
+  .stats { @apply grid grid-cols-2 md:grid-cols-4 gap-3; }
+  .stat { @apply bg-surface border border-line rounded-md shadow-sm; padding: 18px; }
+  .stat.big { @apply bg-sb-active-bg text-white border-transparent shadow-md; }
+  .stat-label { @apply text-[11px] tracking-[.1em] uppercase text-muted font-bold; }
+  .stat.big .stat-label { color: rgba(243,234,208,.6); }
+  .stat-value { @apply font-mono text-2xl font-bold mt-1.5 text-ink; }
+  .stat.big .stat-value { @apply text-sb-active-fg; }
+  .stat.accent { @apply bg-mint-bg border-transparent shadow-sm; }
+  .stat.accent .stat-value { @apply text-mint-fg; }
+  .stat.accent .stat-label { @apply text-mint-fg; }
+  .report-cols { @apply grid grid-cols-2 md:grid-cols-3 gap-3 mt-3; }
+  .card { @apply bg-surface border border-line rounded-md shadow-sm; padding: 18px; }
+  .card h2 { @apply text-[13.5px] font-extrabold m-0 mb-2.5 text-ink; }
+  .card .rc-row { @apply font-mono text-[13px]; }
+  .pay-bar-wrap { @apply h-2 bg-surface-2 rounded-full overflow-hidden; margin: 6px 0 4px; }
+  .pay-bar { @apply h-full rounded-full transition-all; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); }
+
+  /* ---- tabs (inventory filters) ---- */
+  .tabs { @apply flex gap-1 mb-4; }
+  .tab { @apply rounded-sm text-sm font-semibold border-[1.5px] border-transparent text-muted bg-transparent transition-all; padding: 8px 16px; }
+  .tab:hover { @apply text-ink bg-surface-2; }
+  .tab.on { @apply bg-accent-tint text-accent-text; border-color: rgba(184,150,58,.3); }
+
+  /* ---- badges / pills ---- */
+  .badge { @apply inline-block text-[11px] font-bold rounded-full; padding: 2px 8px; }
+  .badge-green  { @apply bg-green-tint text-green; }
+  .badge-amber  { @apply text-amber-warn; background: rgba(192,138,16,.12); }
+  .badge-red    { @apply bg-red-tint text-red; }
+  .badge-muted  { @apply bg-surface-2 text-muted; }
+  .badge-accent { @apply bg-accent-tint text-accent-text; }
+
+  /* ---- settings ---- */
+  .settings-section { @apply bg-surface border border-line rounded-md mb-4 shadow-sm; padding: 22px; }
+  .settings-section h2 { @apply m-0 mb-4 text-[14.5px] font-extrabold text-ink tracking-tight; }
+
+  /* ---- dashboard shared cards ---- */
+  .dash-card { @apply bg-surface border border-line rounded-md shadow-sm; padding: 20px 22px; }
+  .dash-card-head { @apply flex justify-between items-center mb-3.5; }
+  .dash-card-head h3 { @apply m-0 text-sm font-extrabold text-ink; }
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    transition: background .2s ease, color .2s ease;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input  { font-family: inherit; font-size: 15px; }
+  * {
+    @apply border-border outline-ring/50;
+  }
+}
+
+/* ================================================================
+   PRINT — 80mm thermal receipt + Z-report
+   ================================================================ */
+@media print {
+  @page { size: 80mm auto; margin: 4mm; }
+
+  /* Default receipt path: hide app, show portal */
+  #root       { display: none !important; }
+  #print-root { display: block; }
+
+  /* Z-report path: show only the modal content, strip chrome */
+  body.printing-zreport #root { display: block !important; }
+  body.printing-zreport #print-root { display: none !important; }
+  body.printing-zreport [data-slot="sidebar"] { display: none !important; }
+  body.printing-zreport [data-slot="sidebar-inset"] > *:not(.overlay) { display: none !important; }
+  body.printing-zreport .overlay { background: none !important; padding: 0 !important; display: block !important; }
+  body.printing-zreport .modal   { box-shadow: none !important; border: 1px solid #ccc !important; max-height: none !important; overflow: visible !important; max-width: 100% !important; }
+  body.printing-zreport .z-report-actions { display: none !important; }
+  body.printing-zreport .x { display: none !important; }
+
+  body {
+    margin: 0; background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #print-root .receipt-paper {
+    width: 72mm;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    font-size: 8.5pt; line-height: 1.45;
+    color: #000; background: #fff; border: none; padding: 0;
+  }
+  #print-root .rp-store {
+    text-align: center; font-weight: 700;
+    font-size: 11pt; letter-spacing: .1em; margin-bottom: 1.5mm;
+  }
+  #print-root .rp-meta {
+    text-align: center; font-size: 7pt; color: #555; margin-bottom: .5mm;
+  }
+  #print-root .rc-rule {
+    border: none; border-top: 1px dashed #000; margin: 2mm 0;
+  }
+  #print-root .rc-row {
+    display: flex; justify-content: space-between;
+    font-size: 8.5pt; padding: .3mm 0;
+  }
+  #print-root .rc-total {
+    font-size: 11pt; font-weight: 700; padding: 1.5mm 0;
+  }
+  #print-root .rp-footer {
+    text-align: center; font-size: 7.5pt; color: #555; margin-top: 3mm;
+  }
+  #print-root::after {
+    content: '- - - - - - - - - - - - - - - -';
+    display: block; font-family: 'Courier New', monospace;
+    font-size: 7pt; color: #aaa; text-align: center;
+    margin-top: 8mm; letter-spacing: .1em;
+  }
+}
+
+@theme inline {
+  --font-heading:      var(--font-sans);
+  --color-sidebar-ring:      var(--sidebar-ring);
+  --color-sidebar-border:      var(--sidebar-border);
+  --color-sidebar-accent-foreground:      var(--sidebar-accent-foreground);
+  --color-sidebar-accent:      var(--sidebar-accent);
+  --color-sidebar-primary-foreground:      var(--sidebar-primary-foreground);
+  --color-sidebar-primary:      var(--sidebar-primary);
+  --color-sidebar-foreground:      var(--sidebar-foreground);
+  --color-sidebar:      var(--sidebar);
+  --color-chart-5:      var(--chart-5);
+  --color-chart-4:      var(--chart-4);
+  --color-chart-3:      var(--chart-3);
+  --color-chart-2:      var(--chart-2);
+  --color-chart-1:      var(--chart-1);
+  --color-ring:      var(--ring);
+  --color-input:      var(--input);
+  --color-border:      var(--border);
+  --color-destructive:      var(--destructive);
+  --color-accent-foreground:      var(--accent-foreground);
+  --color-accent:      var(--accent);
+  --color-muted-foreground:      var(--muted-foreground);
+  --color-muted:      var(--muted);
+  --color-secondary-foreground:      var(--secondary-foreground);
+  --color-secondary:      var(--secondary);
+  --color-primary-foreground:      var(--primary-foreground);
+  --color-primary:      var(--primary);
+  --color-popover-foreground:      var(--popover-foreground);
+  --color-popover:      var(--popover);
+  --color-card-foreground:      var(--card-foreground);
+  --color-card:      var(--card);
+  --color-foreground:      var(--foreground);
+  --color-background:      var(--background);
+  --radius-xl:      calc(var(--radius) * 1.4);
+  --radius-2xl:      calc(var(--radius) * 1.8);
+  --radius-3xl:      calc(var(--radius) * 2.2);
+  --radius-4xl:      calc(var(--radius) * 2.6);
+}
+
+/* Keyed off [data-theme="dark"] (see @custom-variant above) instead of
+   shadcn's default .dark class, so it follows the same toggle as the
+   rest of the app. --accent / --muted are intentionally omitted here —
+   the app's own [data-theme="dark"] block above already sets those. */
+[data-theme="dark"] {
+  --background:      oklch(0.145 0 0);
+  --foreground:      oklch(0.985 0 0);
+  --card:      oklch(0.205 0 0);
+  --card-foreground:      oklch(0.985 0 0);
+  --popover:      oklch(0.205 0 0);
+  --popover-foreground:      oklch(0.985 0 0);
+  --primary:      oklch(0.922 0 0);
+  --primary-foreground:      oklch(0.205 0 0);
+  --secondary:      oklch(0.269 0 0);
+  --secondary-foreground:      oklch(0.985 0 0);
+  --muted-foreground:      oklch(0.708 0 0);
+  --accent-foreground:      oklch(0.985 0 0);
+  --destructive:      oklch(0.704 0.191 22.216);
+  --border:      oklch(1 0 0 / 10%);
+  --input:      oklch(1 0 0 / 15%);
+  --ring:      oklch(0.556 0 0);
+  --chart-1:      oklch(0.87 0 0);
+  --chart-2:      oklch(0.556 0 0);
+  --chart-3:      oklch(0.439 0 0);
+  --chart-4:      oklch(0.371 0 0);
+  --chart-5:      oklch(0.269 0 0);
+  /* --sidebar* intentionally omitted — :root's var(--sb-*) chain already
+     self-adjusts for [data-theme="dark"], no separate override needed. */
+}
