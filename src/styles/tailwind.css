@@ -404,7 +404,7 @@
   .rc-actions .btn.pay { @apply flex-1; }
   .btn.pay:hover { @apply from-accent-hover; --tw-gradient-to: #7a5e18; }
   .btn.pay:active { @apply scale-[.98]; }
-  .btn.pay:disabled { @apply bg-surface-3 text-muted cursor-not-allowed shadow-none; }
+  .btn.pay:disabled { @apply bg-none bg-surface-3 text-muted cursor-not-allowed shadow-none; }
   .btn.ghost { @apply bg-transparent border-[1.5px] border-line text-muted; }
   .btn.ghost:hover:not(:disabled) { @apply border-red text-red; }
   .btn.ghost:disabled { @apply opacity-50 cursor-not-allowed; }
