@@ -3,10 +3,10 @@ import { supabase } from '../lib/supabase'
 import Modal from '../components/Modal'
 
 const REASON_COLORS = {
-  sale:       { color: 'var(--ink)',   bg: '#e8e4dc' },
+  sale:       { color: 'var(--ink-2)', bg: 'var(--surface-3)' },
   restock:    { color: '#fff',         bg: 'var(--green)' },
-  return:     { color: '#fff',         bg: '#0a7a5a' },
-  adjustment: { color: 'var(--ink)',   bg: 'var(--amber)' },
+  return:     { color: '#fff',         bg: 'var(--green-dark)' },
+  adjustment: { color: '#fff',         bg: 'var(--amber-warn)' },
   spoilage:   { color: '#fff',         bg: 'var(--red)' },
 }
 

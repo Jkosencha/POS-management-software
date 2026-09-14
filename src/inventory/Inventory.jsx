@@ -51,6 +51,8 @@ export default function Inventory({ money }) {
         barcode: data.barcode || null,
         category: data.category,
         price: data.price,
+        cost_price: data.cost_price,
+        supplier: data.supplier,
         stock: data.stock,
         low_at: data.low_at,
       }).eq('id', data.id)
@@ -63,6 +65,8 @@ export default function Inventory({ money }) {
         barcode: data.barcode || null,
         category: data.category,
         price: data.price,
+        cost_price: data.cost_price,
+        supplier: data.supplier,
         stock: data.stock,
         low_at: data.low_at,
       })
@@ -136,12 +140,10 @@ export default function Inventory({ money }) {
         {list.map(p => (
           <div
             key={p.id}
-            className="tr"
+            className={`tr ${p.active && p.stock === 0 ? 'row-zero' : p.active && p.stock <= p.low_at ? 'row-low' : ''}`}
             style={{
               gridTemplateColumns: '2.2fr 1fr 1.2fr 1fr .8fr 1.4fr',
               opacity: !p.active ? 0.45 : 1,
-              background: p.active && p.stock <= p.low_at && p.stock > 0 ? '#fffbf0' :
-                          p.active && p.stock === 0 ? '#fff5f5' : undefined,
             }}
           >
             <span>{p.name}{!p.active ? ' (inactive)' : ''}</span>

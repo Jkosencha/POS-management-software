@@ -160,7 +160,7 @@ export default function DayClose({ money, onClose }) {
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   marginTop: 10, padding: '10px 14px', borderRadius: 8,
-                  background: variance === 0 ? 'var(--green-tint)' : variance > 0 ? '#fff8ec' : 'var(--red-tint)',
+                  background: variance === 0 ? 'var(--green-tint)' : variance > 0 ? 'var(--amber-tint)' : 'var(--red-tint)',
                   border: `1.5px solid ${variance === 0 ? 'rgba(26,122,72,.2)' : variance > 0 ? 'rgba(208,140,10,.25)' : 'rgba(192,57,43,.25)'}`,
                 }}>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>
