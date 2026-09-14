@@ -3,3 +3,4 @@ dist
 .env.local
 .env.*.local
 scripts/reset-password.js
+scripts/update-email.js

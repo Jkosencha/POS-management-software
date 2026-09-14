@@ -101,10 +101,14 @@ create trigger trg_apply_stock
   for each row execute function apply_stock_movement();
 
 -- Auto-create profile on first sign-up
+-- Table name is schema-qualified and search_path pinned because triggers on
+-- auth.users run in a context where "public" isn't guaranteed to be on the
+-- search path — an unqualified `profiles` reference fails there even though
+-- the table exists (see 42P01 "relation does not exist" during user creation).
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, full_name, role)
+  insert into public.profiles (id, full_name, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
@@ -113,7 +117,7 @@ begin
   on conflict (id) do nothing;
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
