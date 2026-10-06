@@ -1,45 +1,34 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Modal from '../components/Modal'
+import ReasonBadge from '../components/ReasonBadge'
+import { PartnerBadge } from '../components/PartnerBadge'
+import BatchOwners from './BatchOwners'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-const REASON_COLORS = {
-  sale:       { color: 'var(--ink-2)', bg: 'var(--surface-3)' },
-  restock:    { color: '#fff',         bg: 'var(--green)' },
-  return:     { color: '#fff',         bg: 'var(--green-dark)' },
-  adjustment: { color: '#fff',         bg: 'var(--amber-warn)' },
-  spoilage:   { color: '#fff',         bg: 'var(--red)' },
-}
-
-function ReasonBadge({ reason }) {
-  const style = REASON_COLORS[reason] || { color: 'var(--ink)', bg: 'var(--line)' }
-  return (
-    <span style={{
-      background: style.bg, color: style.color,
-      fontSize: 11, fontWeight: 700, borderRadius: 99,
-      padding: '2px 8px', letterSpacing: '.04em', textTransform: 'uppercase',
-    }}>
-      {reason}
-    </span>
-  )
-}
-
-export default function StockHistoryModal({ product, onClose }) {
+export default function StockHistoryModal({ product, partners = [], onClose, onChanged }) {
   const [movements, setMovements] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     supabase
       .from('stock_movements')
-      .select('*, profiles(full_name)')
+      .select('*, profiles(full_name), partners(name, color)')
       .eq('product_id', product.id)
       .order('created_at', { ascending: false })
       .limit(50)
-      .then(({ data }) => {
+      .then(async ({ data, error }) => {
+        // Before migration 010 there's no partners relation to embed
+        if (error) {
+          ({ data } = await supabase.from('stock_movements').select('*, profiles(full_name)')
+            .eq('product_id', product.id).order('created_at', { ascending: false }).limit(50))
+        }
         setMovements(data || [])
         setLoading(false)
       })
   }, [product.id])
 
+  // Walk backwards from the current stock to get the balance after each movement
   const runningStock = []
   let running = product.stock
   for (const m of movements) {
@@ -48,55 +37,54 @@ export default function StockHistoryModal({ product, onClose }) {
   }
 
   return (
-    <Modal title={`Stock history — ${product.name}`} onClose={onClose}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, fontFamily: 'IBM Plex Mono, monospace' }}>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>Current stock</span>
-        <span style={{ fontSize: 19, fontWeight: 700 }}>{product.stock}</span>
+    <Modal title={`Stock history: ${product.name}`} onClose={onClose} className="max-w-[640px]">
+      <div className="flex justify-between items-center mb-3 rounded-sm bg-surface-2 px-4 py-3">
+        <span className="text-[13px] text-muted">Current stock</span>
+        <span className="text-xl font-bold font-mono">{product.stock}</span>
       </div>
 
-      {loading && <p style={{ color: 'var(--muted)', fontSize: 13 }}>Loading…</p>}
+      <div className="mb-4">
+        <BatchOwners productId={product.id} partners={partners} onChanged={onChanged} />
+      </div>
+
+      {loading && <p className="text-muted text-[13px]">Loading...</p>}
 
       {!loading && movements.length === 0 && (
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>No movements recorded yet.</p>
+        <p className="text-muted text-[13px]">No movements recorded yet.</p>
       )}
 
       {!loading && movements.length > 0 && (
-        <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-          {movements.map((m, i) => (
-            <div key={m.id} style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto auto',
-              gap: '4px 12px',
-              padding: '10px 0',
-              borderTop: i > 0 ? '1px solid var(--line)' : 'none',
-              alignItems: 'start',
-              fontFamily: 'IBM Plex Mono, monospace',
-              fontSize: 13,
-            }}>
-              <div>
-                <ReasonBadge reason={m.reason} />
-                {m.note && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>{m.note}</div>
-                )}
-                <div style={{ marginTop: 3, fontSize: 11, color: 'var(--muted)' }}>
-                  {new Date(m.created_at).toLocaleString('en-KE')}
-                  {m.profiles?.full_name ? ` · ${m.profiles.full_name}` : ''}
-                </div>
-              </div>
-              <div style={{
-                fontWeight: 700,
-                fontSize: 15,
-                color: m.qty_change > 0 ? 'var(--green)' : 'var(--red)',
-                textAlign: 'right',
-                whiteSpace: 'nowrap',
-              }}>
-                {m.qty_change > 0 ? '+' : ''}{m.qty_change}
-              </div>
-              <div style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 13 }}>
-                → {runningStock[i]}
-              </div>
-            </div>
-          ))}
+        <div className="max-h-[400px] overflow-y-auto rounded-sm border border-line">
+          <Table>
+            <TableHeader className="sticky top-0 bg-surface z-10">
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Movement</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {movements.map((m, i) => (
+                <TableRow key={m.id}>
+                  <TableCell className="whitespace-normal">
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      <ReasonBadge reason={m.reason} />
+                      {m.partners && <PartnerBadge partner={m.partners} />}
+                    </span>
+                    {m.note && <div className="mt-1 text-xs text-ink-2">{m.note}</div>}
+                    <div className="mt-0.5 text-[11px] text-muted">
+                      {new Date(m.created_at).toLocaleString('en-KE')}
+                      {m.profiles?.full_name ? ` · ${m.profiles.full_name}` : ''}
+                    </div>
+                  </TableCell>
+                  <TableCell className={`num font-bold ${m.qty_change > 0 ? 'text-green' : 'text-red'}`}>
+                    {m.qty_change > 0 ? '+' : ''}{m.qty_change}
+                  </TableCell>
+                  <TableCell className="num text-muted">{runningStock[i]}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </Modal>
