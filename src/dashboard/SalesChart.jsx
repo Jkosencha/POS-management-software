@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
+import { localKey } from '../lib/dates'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import ChartTooltip from './ChartTooltip'
+
+const PERIODS = [
+  { value: '7',  label: 'Last 7 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+]
 
 function fmtAxis(v) {
   if (v === 0) return '0'
@@ -15,32 +25,31 @@ function buildDays(n) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     days.push({
-      date:    d.toISOString().slice(0, 10),
-      label:   d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' }),
+      date:    localKey(d),
+      label:   d.toLocaleDateString('en-KE', { day: '2-digit', month: 'short' }),
       revenue: 0,
-      count:   0,
+      cost:    0,
     })
   }
   return days
 }
 
-const BAR_COLORS = [
-  'var(--pastel-mint-fg)', 'var(--pastel-teal-fg)', 'var(--pastel-lavender-fg)',
-  'var(--pastel-coral-fg)', 'var(--accent)',
-]
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null
+function LegendDot({ color, label }) {
   return (
-    <div className="bg-surface border border-line rounded-md shadow-md px-3 py-2 text-xs">
-      <div className="text-muted mb-0.5">{label}</div>
-      <div className="font-mono font-bold">KSh {payload[0].value.toLocaleString('en-KE')}</div>
-    </div>
+    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2">
+      <span className="size-2.5 rounded-[3px]" style={{ background: color }} />
+      {label}
+    </span>
   )
 }
 
-export default function SalesChart() {
-  const [period, setPeriod]   = useState('7')
+/*
+ * Revenue vs cost of goods sold per day (Finly "Income vs Expenses" look).
+ * Cost comes from the cost_price snapshot on each sale line, so days with
+ * un-costed products under-state cost.
+ */
+export default function SalesChart({ money, showCost = true }) {
+  const [period, setPeriod]   = useState('30')
   const [data, setData]       = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -54,19 +63,24 @@ export default function SalesChart() {
       from.setDate(from.getDate() - n + 1)
       from.setHours(0, 0, 0, 0)
 
-      const { data: sales } = await supabase
+      const { data: sales } = await fetchAll(() => supabase
         .from('sales')
-        .select('total, created_at')
+        .select('total, created_at, sale_items(qty, cost_price)')
         .gte('created_at', from.toISOString())
         .eq('status', 'completed')
+        .order('id'))
 
       if (cancelled) return
 
       const days = buildDays(n)
+      const byKey = Object.fromEntries(days.map(d => [d.date, d]))
       ;(sales || []).forEach(s => {
-        const key = s.created_at.slice(0, 10)
-        const day = days.find(d => d.date === key)
-        if (day) { day.revenue += Number(s.total); day.count++ }
+        const day = byKey[localKey(new Date(s.created_at))]
+        if (!day) return
+        day.revenue += Number(s.total)
+        ;(s.sale_items || []).forEach(i => {
+          if (i.cost_price != null) day.cost += Number(i.cost_price) * i.qty
+        })
       })
       setData(days)
       setLoading(false)
@@ -77,65 +91,80 @@ export default function SalesChart() {
   }, [period])
 
   const totalRevenue = data.reduce((n, d) => n + d.revenue, 0)
+  const totalCost    = data.reduce((n, d) => n + d.cost, 0)
 
   return (
     <div>
-      <div className="flex justify-between items-start mb-4.5">
+      <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
         <div>
-          <h3 className="m-0 mb-0.5 text-sm font-extrabold text-ink">Revenue trend</h3>
-          {!loading && (
-            <div className="text-xs text-muted">
-              {totalRevenue === 0
-                ? 'No sales in this period'
-                : `KSh ${totalRevenue.toLocaleString('en-KE')} total · ${period} days`}
+          <h3 className="m-0 text-[15px] font-bold text-ink">{showCost ? 'Revenue vs. Cost' : 'My sales'}</h3>
+          <div className="flex gap-4 mt-2">
+            <LegendDot color="var(--chart-1)" label="Revenue" />
+            {showCost && <LegendDot color="var(--chart-2)" label="Cost" />}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {showCost && !loading && totalRevenue > 0 && (
+            <div className="text-right hidden sm:block">
+              <div className="text-[11px] text-muted">Gross profit</div>
+              <div className="font-mono font-bold text-sm text-ink">{money(Math.round(totalRevenue - totalCost))}</div>
             </div>
           )}
-        </div>
-        <div className="flex gap-1">
-          {[['7', '7 days'], ['30', '30 days']].map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setPeriod(v)}
-              className={`px-3.5 py-1.5 rounded-sm text-xs font-semibold border-[1.5px] transition-all ${
-                period === v
-                  ? 'border-accent/35 bg-accent-tint text-accent-text'
-                  : 'border-line bg-transparent text-muted hover:bg-surface-2'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger size="sm" className="w-[140px] rounded-full bg-surface-2 border-transparent font-semibold">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {loading ? (
-        <div className="h-40 flex items-center justify-center text-muted text-sm">Loading chart…</div>
+        <div className="h-60 flex items-center justify-center text-muted text-sm">Loading chart...</div>
       ) : totalRevenue === 0 ? (
-        <div className="h-40 flex items-center justify-center text-muted text-sm italic">
+        <div className="h-60 flex items-center justify-center text-muted text-sm">
           No completed sales in this period
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="4 4" />
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={data} margin={{ top: 10, right: 6, left: -6, bottom: 0 }}>
+            <defs>
+              <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="var(--chart-1)" stopOpacity={0.32} />
+                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke="var(--line)" />
             <XAxis
               dataKey="label" tickLine={false} axisLine={false}
-              tick={{ fontSize: 10, fill: 'var(--muted)' }}
-              interval={data.length > 10 ? 4 : 0}
+              tick={{ fontSize: 11, fill: 'var(--muted)' }}
+              interval="preserveStartEnd" minTickGap={18} dy={6}
             />
             <YAxis
               tickLine={false} axisLine={false}
-              tick={{ fontSize: 10, fill: 'var(--muted)' }}
+              tick={{ fontSize: 11, fill: 'var(--muted)' }}
               tickFormatter={fmtAxis}
-              width={40}
+              width={44}
             />
-            <Tooltip cursor={{ fill: 'var(--surface-2)' }} content={<ChartTooltip />} />
-            <Bar dataKey="revenue" radius={[4, 4, 0, 0]} maxBarSize={28}>
-              {data.map((d, i) => (
-                <Cell key={d.date} fill={BAR_COLORS[i % BAR_COLORS.length]} opacity={d.revenue > 0 ? 1 : 0.15} />
-              ))}
-            </Bar>
-          </BarChart>
+            <Tooltip
+              cursor={{ stroke: 'var(--chart-1)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+              content={<ChartTooltip money={money} />}
+            />
+            <Area
+              type="monotone" dataKey="revenue" name="Revenue"
+              stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#revenueFill)"
+              dot={false} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--surface)', fill: 'var(--chart-1)' }}
+            />
+            {showCost && (
+              <Area
+                type="monotone" dataKey="cost" name="Cost"
+                stroke="var(--chart-2)" strokeWidth={2.5} fill="transparent"
+                dot={false} activeDot={{ r: 5, strokeWidth: 3, stroke: 'var(--surface)', fill: 'var(--chart-2)' }}
+              />
+            )}
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </div>

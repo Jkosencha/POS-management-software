@@ -36,5 +36,10 @@ export function useTheme() {
     setTheme(next)
   }
 
-  return { isDark, toggle }
+  function setMode(mode) {
+    localStorage.setItem('pos-theme', mode)
+    setTheme(mode)
+  }
+
+  return { isDark, toggle, setMode }
 }

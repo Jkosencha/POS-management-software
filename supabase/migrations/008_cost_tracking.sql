@@ -1,5 +1,5 @@
 -- ============================================================
--- 008_cost_tracking.sql — cost price + supplier, for real profit/margin
+-- 008_cost_tracking.sql: cost price + supplier, for real profit/margin
 -- Run in: Supabase SQL editor
 -- ============================================================
 

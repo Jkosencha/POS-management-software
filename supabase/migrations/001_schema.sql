@@ -1,5 +1,5 @@
 -- ============================================================
--- 001_schema.sql — core tables + triggers + checkout RPC
+-- 001_schema.sql: core tables + triggers + checkout RPC
 -- Run this in the Supabase SQL editor (Project → SQL Editor)
 -- ============================================================
 
@@ -103,7 +103,7 @@ create trigger trg_apply_stock
 -- Auto-create profile on first sign-up
 -- Table name is schema-qualified and search_path pinned because triggers on
 -- auth.users run in a context where "public" isn't guaranteed to be on the
--- search path — an unqualified `profiles` reference fails there even though
+-- search path: an unqualified `profiles` reference fails there even though
 -- the table exists (see 42P01 "relation does not exist" during user creation).
 create or replace function handle_new_user()
 returns trigger as $$

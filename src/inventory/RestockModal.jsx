@@ -1,20 +1,27 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Modal from '../components/Modal'
+import { Button } from '@/components/ui/button'
+import { PartnerSelect } from '../components/PartnerBadge'
+import BuyingPriceInput from '../components/BuyingPriceInput'
+import PricingSummary from '../components/PricingSummary'
 
 const REASONS = [
   { value: 'restock',    label: 'Restock',    sign: +1, hint: 'Adding new stock from supplier' },
   { value: 'return',     label: 'Return',     sign: +1, hint: 'Customer return put back to shelf' },
-  { value: 'adjustment', label: 'Adjustment', sign:  0, hint: 'Stock count correction (use − for reduction)' },
+  { value: 'adjustment', label: 'Adjustment', sign:  0, hint: 'Stock count correction (use a minus sign to reduce)' },
   { value: 'spoilage',   label: 'Spoilage',   sign: -1, hint: 'Damaged or expired items removed' },
 ]
 
-export default function RestockModal({ product, onClose, onDone }) {
+export default function RestockModal({ product, partners = [], onClose, onDone }) {
   const [reason, setReason] = useState('restock')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
   const [unitCost, setUnitCost] = useState(product.cost_price ?? '')
   const [supplier, setSupplier] = useState(product.supplier || '')
+  // Increase: whose stock (partner id, null = Shared). Decrease: whose stock to
+  // take first (undefined = oldest stock first).
+  const [owner, setOwner] = useState(undefined)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -23,7 +30,9 @@ export default function RestockModal({ product, onClose, onDone }) {
   const qtyNum = Number(qty) || 0
   const qtyChange = selected.sign === 0 ? qtyNum : selected.sign * Math.abs(qtyNum)
   const newStock = product.stock + qtyChange
-  const valid = qtyNum !== 0 && (selected.sign === 0 ? true : qtyNum > 0)
+  const isIncrease = qtyChange > 0
+  const needsOwner = isIncrease && partners.length > 0 && owner === undefined
+  const valid = qtyNum !== 0 && (selected.sign === 0 ? true : qtyNum > 0) && !needsOwner
 
   const handleSubmit = async () => {
     setSaving(true)
@@ -36,6 +45,7 @@ export default function RestockModal({ product, onClose, onDone }) {
       reason,
       note: note.trim() || null,
       unit_cost: isRestock ? unitCostNum : null,
+      ...(owner != null ? { partner_id: owner } : {}),
     })
     if (error) { setSaving(false); return setError(error.message) }
 
@@ -53,21 +63,20 @@ export default function RestockModal({ product, onClose, onDone }) {
   }
 
   return (
-    <Modal title={`Restock — ${product.name}`} onClose={onClose}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+    <Modal title={`Restock: ${product.name}`} onClose={onClose}>
+      <div className="flex flex-wrap gap-1.5 mb-3">
         {REASONS.map(r => (
           <button
             key={r.value}
-            className={`pm-method ${reason === r.value ? 'on' : ''}`}
-            style={{ fontSize: 13, padding: '9px 10px' }}
-            onClick={() => setReason(r.value)}
+            className={`cat ${reason === r.value ? 'on' : ''}`}
+            onClick={() => { setReason(r.value); setOwner(undefined) }}
           >
             {r.label}
           </button>
         ))}
       </div>
 
-      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 14px' }}>
+      <p className="text-[13px] text-muted mt-0 mb-3.5">
         {selected.hint}
       </p>
 
@@ -76,52 +85,55 @@ export default function RestockModal({ product, onClose, onDone }) {
           <span>
             {selected.sign === -1 ? 'Qty to remove' :
              selected.sign === +1 ? 'Qty to add' :
-             'Qty change (use − for reduction)'}
+             'Qty change (negative to reduce)'}
           </span>
           <input
             type="number"
             autoFocus
             value={qty}
             onChange={e => setQty(e.target.value)}
-            placeholder={selected.sign === 0 ? 'e.g. −3 or 5' : 'e.g. 12'}
+            placeholder={selected.sign === 0 ? 'e.g. -3 or 5' : 'e.g. 12'}
             min={selected.sign >= 0 ? undefined : 1}
           />
         </label>
         <label className="field">
           <span>Current stock</span>
-          <input value={product.stock} disabled style={{ textAlign: 'right' }} />
+          <input value={product.stock} disabled className="text-right" />
         </label>
       </div>
 
       {qtyNum !== 0 && (
-        <div style={{
-          fontFamily: 'IBM Plex Mono, monospace',
-          fontSize: 15,
-          fontWeight: 700,
-          color: newStock < 0 ? 'var(--red)' : newStock <= product.low_at ? 'var(--amber)' : 'var(--green)',
-          marginBottom: 12,
-        }}>
+        <div className={`font-mono text-[15px] font-bold mb-3 ${
+          newStock < 0 ? 'text-red' : newStock <= product.low_at ? 'text-amber-warn' : 'text-green'
+        }`}>
           New stock: {newStock}
-          {newStock < 0 ? ' — cannot go below zero' : ''}
+          {newStock < 0 ? ' (cannot go below zero)' : ''}
+        </div>
+      )}
+
+      {partners.length > 0 && qtyNum !== 0 && (
+        <div className="field">
+          <span>{isIncrease ? 'Whose stock is this?' : 'Take from'}</span>
+          <PartnerSelect
+            key={isIncrease ? 'in' : 'out'}
+            partners={partners}
+            value={owner}
+            onChange={setOwner}
+            includeShared={isIncrease}
+            anyLabel={isIncrease ? undefined : 'Oldest stock first (any owner)'}
+          />
         </div>
       )}
 
       {isRestock && (
-        <div className="field-row">
-          <label className="field">
-            <span>Cost per unit (KSh)</span>
-            <input
-              type="number" min="0"
-              value={unitCost}
-              onChange={e => setUnitCost(e.target.value)}
-              placeholder="What you paid"
-            />
-          </label>
+        <>
+          <BuyingPriceInput qty={qtyNum} value={unitCost} onChange={setUnitCost} />
+          <PricingSummary unitCost={unitCost} price={product.price} />
           <label className="field">
             <span>Supplier</span>
             <input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="e.g. Metro Wholesalers" />
           </label>
-        </div>
+        </>
       )}
 
       <label className="field">
@@ -129,15 +141,15 @@ export default function RestockModal({ product, onClose, onDone }) {
         <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Supplier delivery #INV-442" />
       </label>
 
-      {error && <div className="login-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {error && <div className="alert-error">{error}</div>}
 
-      <button
-        className="btn pay wide"
+      <Button
+        size="lg" className="w-full mt-2"
         disabled={!valid || newStock < 0 || saving}
         onClick={handleSubmit}
       >
-        {saving ? 'Saving…' : `Confirm ${reason}`}
-      </button>
+        {saving ? 'Saving...' : `Confirm ${reason}`}
+      </Button>
     </Modal>
   )
 }

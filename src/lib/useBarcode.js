@@ -5,7 +5,7 @@ const MAX_GAP_MS = 40   // keystrokes faster than this are from a scanner, not a
 
 /**
  * Detects HID barcode scanner input by watching for bursts of fast keystrokes
- * ending in Enter. Works on any OS without drivers — scanners "type" the code.
+ * ending in Enter. Works on any OS without drivers: scanners "type" the code.
  *
  * @param {(code: string) => void} onScan  called with the scanned code
  * @param {boolean} enabled               set false to pause (e.g. while a modal is open)

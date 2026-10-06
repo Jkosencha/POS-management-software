@@ -1,24 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
+import { todayKey as todayStr, daysAgoKey as nDaysAgo, pad2, startOfDay, startOfNextDay } from '../lib/dates'
 import DayClose from './DayClose'
+import ZReportView from './ZReportView'
+import ReasonBadge from '../components/ReasonBadge'
+import DonutChart from '../dashboard/DonutChart'
+import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const PAY_METHODS = ['Cash', 'M-Pesa', 'Card']
+const METHOD_COLOR = { Cash: 'var(--chart-1)', 'M-Pesa': 'var(--chart-3)', Card: 'var(--chart-2)' }
 
-const REASON_COLORS = {
-  sale:       'var(--surface-3)',
-  restock:    'var(--green)',
-  return:     'var(--green-dark)',
-  adjustment: 'var(--amber-warn)',
-  spoilage:   'var(--red)',
-}
-const REASON_TEXT = {
-  sale: 'var(--ink)', restock: '#fff', return: '#fff', adjustment: '#fff', spoilage: '#fff',
-}
-
-const toStr = d => d.toISOString().slice(0, 10)
-const todayStr   = () => toStr(new Date())
-const nDaysAgo   = n => { const d = new Date(); d.setDate(d.getDate() - n); return toStr(d) }
-const startMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01` }
+const startMonth = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01` }
 const startYear  = () => `${new Date().getFullYear()}-01-01`
 
 const PRESETS = [
@@ -29,26 +23,13 @@ const PRESETS = [
   { label: 'This year',   from: startYear,      to: todayStr },
 ]
 
-function Stat({ label, value, accent, sub }) {
+function Stat({ label, value, sub, colorClass = 'bg-surface' }) {
   return (
-    <div className={`stat ${accent ? 'accent' : ''}`}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {sub && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
+    <div className={`rounded-lg p-4.5 shadow-sm ${colorClass}`}>
+      <div className="text-[12.5px] font-semibold text-ink-2">{label}</div>
+      <div className="font-bold text-[22px] mt-2 text-ink leading-tight">{value}</div>
+      {sub && <div className="text-xs text-muted mt-1">{sub}</div>}
     </div>
-  )
-}
-
-function ReasonBadge({ reason }) {
-  return (
-    <span style={{
-      background: REASON_COLORS[reason] || 'var(--line)',
-      color: REASON_TEXT[reason] || 'var(--ink)',
-      fontSize: 11, fontWeight: 700, borderRadius: 99,
-      padding: '2px 8px', letterSpacing: '.04em', textTransform: 'uppercase',
-    }}>
-      {reason}
-    </span>
   )
 }
 
@@ -62,34 +43,57 @@ export default function Reports({ money, role }) {
   const [loading, setLoading]     = useState(true)
   const [movFilter, setMovFilter] = useState('all')
   const [dayCloseOpen, setDayCloseOpen] = useState(false)
+  const [partnerRows, setPartnerRows]   = useState([])
+  const [dayCloses, setDayCloses]       = useState([])
+  const [viewClose, setViewClose]       = useState(null)
 
   const canClose = role === 'manager' || role === 'owner'
 
   const fetchData = useCallback(async (f = from, t = to) => {
     setLoading(true)
-    const fromTs = `${f}T00:00:00`
-    const toTs   = `${t}T23:59:59`
+    const fromTs = startOfDay(f).toISOString()
+    const toTs   = startOfNextDay(t).toISOString()
 
-    const [{ data: salesData }, { data: movData }, { data: stockData }] = await Promise.all([
-      supabase
+    const [{ data: salesData }, { data: movData }, { data: stockData }, { data: closeData }] = await Promise.all([
+      fetchAll(() => supabase
         .from('sales')
         .select('*, sale_items(*)')
         .gte('created_at', fromTs)
-        .lte('created_at', toTs)
+        .lt('created_at', toTs)
         .eq('status', 'completed')           // exclude voided sales from stats
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .order('id')),
       supabase
         .from('stock_movements')
         .select('*, products(name), profiles(full_name)')
         .gte('created_at', fromTs)
-        .lte('created_at', toTs)
+        .lt('created_at', toTs)
         .order('created_at', { ascending: false })
         .limit(200),
       supabase
         .from('products')
         .select('id, name, stock, low_at')
         .eq('active', true),
+      supabase
+        .from('day_closes')
+        // closed_by points at auth.users, not profiles, so it can't be
+        // embedded; names are looked up below
+        .select('*')
+        .gte('period_start', fromTs)
+        .lt('period_start', toTs)
+        .order('period_start', { ascending: false }),
     ])
+    const closes = closeData || []
+    const closerIds = [...new Set(closes.map(d => d.closed_by).filter(Boolean))]
+    if (closerIds.length) {
+      const { data: names } = await supabase.from('profiles').select('id, full_name').in('id', closerIds)
+      const byId = Object.fromEntries((names || []).map(p => [p.id, p.full_name]))
+      closes.forEach(d => { d.closer_name = byId[d.closed_by] })
+    }
+    setDayCloses(closes)
+
+    const { data: partnerData } = await supabase.rpc('partner_summary', { p_from: fromTs, p_to: toTs })
+    setPartnerRows(partnerData || [])
 
     setSales((salesData || []).map(s => ({ ...s, items: s.sale_items || [] })))
     setMovements(movData || [])
@@ -146,171 +150,263 @@ export default function Reports({ money, role }) {
   const filteredMov = movFilter === 'all' ? movements : movements.filter(m => m.reason === movFilter)
   const isToday     = from === todayStr() && to === todayStr()
 
+  const payData = PAY_METHODS.map(m => ({ name: m, value: paySplit[m].total, color: METHOD_COLOR[m] }))
+
   return (
-    <div className="page" style={{ maxWidth: 1100 }}>
+    <div className="page" style={{ maxWidth: 1180 }}>
       <header className="page-head">
         <h1>
           Reports
           {isToday && (
-            <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, color: 'var(--green)', verticalAlign: 'middle' }}>
-              ● live
-            </span>
+            <span className="ml-2.5 text-xs font-semibold text-green align-middle">● live</span>
           )}
         </h1>
         {canClose && (
-          <button className="btn secondary" onClick={() => setDayCloseOpen(true)}>
-            Close day
-          </button>
+          <Button variant="outline" onClick={() => setDayCloseOpen(true)}>Close day</Button>
         )}
       </header>
 
       {/* date range picker */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
+      <div className="flex gap-2 flex-wrap items-center mb-5">
         {PRESETS.map(p => (
           <button
             key={p.label}
             className={`cat ${preset === p.label ? 'on' : ''}`}
-            style={{ margin: 0 }}
             onClick={() => applyPreset(p)}
           >
             {p.label}
           </button>
         ))}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 4 }}>
+        <div className="flex gap-1.5 items-center sm:ml-1">
           <input
             type="date" value={from} max={to}
             onChange={e => { setFrom(e.target.value); setPreset('Custom') }}
-            style={{ padding: '6px 10px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--ink)' }}
+            className="h-8 px-3 rounded-full border border-line bg-surface text-ink text-[13px]"
           />
-          <span style={{ color: 'var(--muted)', fontSize: 13 }}>→</span>
+          <span className="text-muted text-[13px]">to</span>
           <input
             type="date" value={to} min={from} max={todayStr()}
             onChange={e => { setTo(e.target.value); setPreset('Custom') }}
-            style={{ padding: '6px 10px', border: '1.5px solid var(--line)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--ink)' }}
+            className="h-8 px-3 rounded-full border border-line bg-surface text-ink text-[13px]"
           />
           {preset === 'Custom' && (
-            <button className="btn pay" style={{ padding: '7px 14px', fontSize: 13 }} onClick={() => fetchData()}>
-              Apply
-            </button>
+            <Button size="sm" onClick={() => fetchData()}>Apply</Button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <p style={{ color: 'var(--muted)' }}>Loading…</p>
+        <p className="text-muted">Loading...</p>
       ) : (
         <>
           <div className="stats">
-            <Stat label="Revenue" value={money(revenue)} accent sub={`${sales.length} sale${sales.length === 1 ? '' : 's'}`} />
+            <Stat label="Revenue" value={money(revenue)} colorClass="bg-mint-bg" sub={`${sales.length} sale${sales.length === 1 ? '' : 's'}`} />
             <Stat
               label="Profit"
               value={money(Math.round(profit))}
+              colorClass="bg-lavender-bg"
               sub={revenue > 0 ? `${margin.toFixed(1)}% margin${hasCostGaps ? ' · partial' : ''}` : undefined}
             />
-            <Stat label="Items sold" value={itemCount} />
+            <Stat label="Items sold" value={itemCount} colorClass="bg-teal-bg" />
             <Stat label="Avg. basket" value={money(Math.round(avg))} />
-            <Stat label="Low stock" value={lowStock.length} />
+            <Stat label="Low stock" value={lowStock.length} colorClass={lowStock.length > 0 ? 'bg-coral-bg' : 'bg-surface'} />
           </div>
           {hasCostGaps && (
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 14 }}>
-              Profit is a lower bound — some items sold have no recorded cost price yet.
+            <p className="text-xs text-muted mt-2.5 mb-0">
+              Profit is a lower bound: some items sold have no recorded buying price yet.
               Set one in Inventory or on the next restock to sharpen this number.
             </p>
           )}
 
-          <div className="report-cols" style={{ marginTop: 14 }}>
+          {partnerRows.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+              {partnerRows.map(r => {
+                const rev  = Number(r.own_revenue) + Number(r.shared_revenue)
+                const cost = Number(r.own_cost) + Number(r.shared_cost)
+                const pct  = revenue > 0 ? Math.round(rev / revenue * 100) : 0
+                return (
+                  <div key={r.partner_id} className="rounded-lg bg-surface shadow-sm p-4" style={{ boxShadow: `inset 4px 0 0 ${r.color}, var(--shadow-sm)` }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 font-semibold text-ink">
+                        <span className="size-2.5 rounded-full" style={{ background: r.color }} />{r.name}
+                      </span>
+                      <span className="text-xs font-semibold text-muted">{pct}% of revenue</span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2 mt-2">
+                      <span className="text-xl font-bold">{money(Math.round(rev))}</span>
+                      <span className={`text-sm font-semibold ${rev - cost < 0 ? 'text-red' : 'text-green'}`}>
+                        {money(Math.round(rev - cost))} profit
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-surface-2 mt-2.5 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: r.color }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="report-cols mt-4">
             <section className="card">
               <h2>Top sellers</h2>
-              {topProducts.length === 0 && <p className="muted">No sales in this period.</p>}
+              {topProducts.length === 0 && <p className="muted text-sm">No sales in this period.</p>}
               {topProducts.map(t => (
                 <div className="rc-row" key={t.name}>
-                  <span>{t.name} <span className="muted">× {t.qty}</span></span>
-                  <span>{money(t.revenue)}</span>
+                  <span className="truncate pr-2">{t.name} <span className="muted">× {t.qty}</span></span>
+                  <span className="font-mono shrink-0">{money(t.revenue)}</span>
                 </div>
               ))}
             </section>
 
             <section className="card">
               <h2>Payment split</h2>
-              {PAY_METHODS.map(m => (
-                <div className="rc-row" key={m} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <span>{m}</span>
-                    <span>{money(paySplit[m].total)}</span>
-                  </div>
-                  {paySplit[m].total > 0 && revenue > 0 && (
-                    <div className="pay-bar-wrap" style={{ width: '100%' }}>
-                      <div
-                        className="pay-bar"
-                        style={{ width: `${(paySplit[m].total / revenue * 100).toFixed(1)}%` }}
-                      />
-                    </div>
-                  )}
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{paySplit[m].count} sale{paySplit[m].count === 1 ? '' : 's'}</span>
-                </div>
-              ))}
+              {revenue === 0
+                ? <p className="muted text-sm">No sales in this period.</p>
+                : <DonutChart data={payData} money={money} centerLabel={`${sales.length} sales`} height={180} />}
             </section>
 
             <section className="card">
               <h2>Low stock ({lowStock.length})</h2>
-              {lowStock.length === 0 && <p className="muted">All stocked up. ✓</p>}
+              {lowStock.length === 0 && <p className="text-green text-sm font-semibold">All stocked up.</p>}
               {lowStock.map(p => (
                 <div className="rc-row" key={p.id}>
-                  <span>{p.name}</span>
-                  <span className="stock-low">{p.stock} left</span>
+                  <span className="text-red font-semibold truncate pr-2">{p.name}</span>
+                  <span className="text-red font-bold shrink-0">{p.stock} left</span>
                 </div>
               ))}
             </section>
           </div>
 
           {/* stock movement audit */}
-          <section style={{ marginTop: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
-                Stock movements ({movements.length})
+          <section className="mt-6">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-3">
+              <h2 className="m-0 text-base font-bold">
+                Stock movements ({movements.length === 200 ? 'latest 200' : movements.length})
               </h2>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="flex flex-wrap gap-1.5">
                 {['all', 'restock', 'sale', 'adjustment', 'spoilage', 'return'].map(r => (
                   <button
                     key={r}
-                    className={`cat ${movFilter === r ? 'on' : ''}`}
-                    style={{ margin: 0, fontSize: 12, padding: '4px 11px' }}
+                    className={`cat capitalize ${movFilter === r ? 'on' : ''}`}
                     onClick={() => setMovFilter(r)}
                   >
-                    {r === 'all' ? 'All' : r}
+                    {r}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="table">
-              <div className="tr th" style={{ gridTemplateColumns: '1.4fr 2fr 1fr .6fr 1.8fr 1fr' }}>
-                <span>Time</span><span>Product</span><span>Reason</span>
-                <span className="num">Qty</span><span>Note</span><span>By</span>
-              </div>
-              {filteredMov.length === 0 && (
-                <div className="empty-grid">No movements in this period.</div>
-              )}
-              {filteredMov.map(m => (
-                <div className="tr" key={m.id} style={{ gridTemplateColumns: '1.4fr 2fr 1fr .6fr 1.8fr 1fr', fontSize: 13 }}>
-                  <span className="mono" style={{ fontSize: 12 }}>
-                    {new Date(m.created_at).toLocaleString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <span>{m.products?.name || '—'}</span>
-                  <span><ReasonBadge reason={m.reason} /></span>
-                  <span className="num" style={{ color: m.qty_change > 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>
-                    {m.qty_change > 0 ? '+' : ''}{m.qty_change}
-                  </span>
-                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>{m.note || '—'}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>{m.profiles?.full_name || '—'}</span>
-                </div>
-              ))}
+            <div className="table-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Time</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="max-md:hidden">Note</TableHead>
+                    <TableHead className="max-md:hidden">By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMov.length === 0 && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={6} className="empty-grid">No movements in this period.</TableCell>
+                    </TableRow>
+                  )}
+                  {filteredMov.map(m => (
+                    <TableRow key={m.id} className="text-[13px]">
+                      <TableCell className="mono text-xs text-ink-2">
+                        {new Date(m.created_at).toLocaleString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                      <TableCell className="font-medium">{m.products?.name || '-'}</TableCell>
+                      <TableCell><ReasonBadge reason={m.reason} /></TableCell>
+                      <TableCell className={`num font-bold ${m.qty_change > 0 ? 'text-green' : 'text-red'}`}>
+                        {m.qty_change > 0 ? '+' : ''}{m.qty_change}
+                      </TableCell>
+                      <TableCell className="text-muted text-xs max-md:hidden whitespace-normal">{m.note || '-'}</TableCell>
+                      <TableCell className="text-muted text-xs max-md:hidden">{m.profiles?.full_name || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </section>
         </>
       )}
 
-      {dayCloseOpen && <DayClose money={money} onClose={() => setDayCloseOpen(false)} />}
+      {/* saved Z-reports */}
+      {!loading && (
+        <section className="mt-6">
+          <h2 className="m-0 mb-1 text-base font-bold">Day closes ({dayCloses.length})</h2>
+          <p className="text-xs text-muted mt-0 mb-3">Click a row to open the full Z-report.</p>
+          <div className="table-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Day</TableHead>
+                  <TableHead className="text-right">Sales</TableHead>
+                  <TableHead className="text-right max-md:hidden">Cash</TableHead>
+                  <TableHead className="text-right max-md:hidden">M-Pesa</TableHead>
+                  <TableHead className="text-right">Expected cash</TableHead>
+                  <TableHead className="text-right">Counted</TableHead>
+                  <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="max-lg:hidden">Closed by</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dayCloses.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={8} className="empty-grid">No days closed in this period.</TableCell>
+                  </TableRow>
+                )}
+                {dayCloses.map(d => {
+                  const v = d.variance == null ? null : Number(d.variance)
+                  return (
+                    <TableRow
+                      key={d.id}
+                      className="text-[13px] cursor-pointer"
+                      onClick={() => setViewClose(d)}
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter') setViewClose(d) }}
+                    >
+                      <TableCell className="font-medium">
+                        {new Date(d.period_start).toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        <div className="text-[11px] text-muted font-normal">
+                          closed {new Date(d.closed_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        {d.notes && <div className="text-xs text-muted font-normal whitespace-normal">{d.notes}</div>}
+                      </TableCell>
+                      <TableCell className="num">{money(d.total_sales)}</TableCell>
+                      <TableCell className="num max-md:hidden">{money(d.cash_sales)}</TableCell>
+                      <TableCell className="num max-md:hidden">{money(d.mpesa_sales)}</TableCell>
+                      <TableCell className="num">{money(d.expected_cash)}</TableCell>
+                      <TableCell className="num">{d.actual_cash == null ? '-' : money(d.actual_cash)}</TableCell>
+                      <TableCell className={`num font-bold ${v == null ? 'text-muted' : v === 0 ? 'text-green' : v > 0 ? 'text-amber-warn' : 'text-red'}`}>
+                        {v == null ? '-' : `${v > 0 ? '+' : ''}${money(v)}`}
+                      </TableCell>
+                      <TableCell className="text-muted text-xs max-lg:hidden">{d.closer_name || '-'}</TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+      )}
+
+      {viewClose && (
+        <ZReportView
+          report={viewClose}
+          money={money}
+          canDelete={role === 'owner'}
+          onClose={() => setViewClose(null)}
+          onDeleted={() => { setViewClose(null); fetchData() }}
+        />
+      )}
+
+      {dayCloseOpen && <DayClose money={money} onClose={() => { setDayCloseOpen(false); fetchData() }} />}
     </div>
   )
 }

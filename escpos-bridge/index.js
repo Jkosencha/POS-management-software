@@ -1,5 +1,5 @@
 /**
- * ESC/POS bridge — run on the till PC with `node index.js`
+ * ESC/POS bridge: run on the till PC with `node index.js`
  *
  * The browser app POSTs receipt JSON to http://127.0.0.1:8080/print
  * and this service forwards it to the USB thermal printer.
@@ -104,6 +104,9 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin',  '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  // Chrome blocks an https site from calling localhost unless the local
+  // server opts in (Private Network Access)
+  res.setHeader('Access-Control-Allow-Private-Network', 'true')
 
   if (req.method === 'OPTIONS') { res.writeHead(200); return res.end() }
 

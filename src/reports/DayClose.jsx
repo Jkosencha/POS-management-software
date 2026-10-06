@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import Modal from '../components/Modal'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../auth/useSession'
-
-const todayStr = () => new Date().toISOString().slice(0, 10)
+import { todayKey as todayStr, startOfDay, startOfNextDay } from '../lib/dates'
+import { Button } from '@/components/ui/button'
 
 export default function DayClose({ money, onClose }) {
   const { session } = useSession()
@@ -22,18 +22,18 @@ export default function DayClose({ money, onClose }) {
   useEffect(() => {
     async function fetchDay() {
       setLoading(true)
-      const from = `${date}T00:00:00`
-      const to   = `${date}T23:59:59`
+      const from = startOfDay(date).toISOString()
+      const to   = startOfNextDay(date).toISOString()
       const [{ data: completedData }, { count: voids }] = await Promise.all([
         supabase
           .from('sales')
           .select('method, total, tendered, change')
-          .gte('created_at', from).lte('created_at', to)
+          .gte('created_at', from).lt('created_at', to)
           .eq('status', 'completed'),
         supabase
           .from('sales')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', from).lte('created_at', to)
+          .gte('created_at', from).lt('created_at', to)
           .eq('status', 'voided'),
       ])
       setSales(completedData || [])
@@ -59,8 +59,8 @@ export default function DayClose({ money, onClose }) {
     setError(null)
     const { error: err } = await supabase.from('day_closes').insert({
       closed_by:    session?.user?.id,
-      period_start: `${date}T00:00:00`,
-      period_end:   `${date}T23:59:59`,
+      period_start: startOfDay(date).toISOString(),
+      period_end:   startOfNextDay(date).toISOString(),
       opening_float: float,
       cash_sales:    cashSales,
       mpesa_sales:   mpesaSales,
@@ -87,38 +87,31 @@ export default function DayClose({ money, onClose }) {
   }
 
   const Row = ({ label, value, bold, color }) => (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between',
-      padding: '5px 0', fontWeight: bold ? 700 : 400,
-      color: color || 'var(--ink)',
-      borderTop: bold ? '1.5px dashed var(--line)' : 'none',
-      marginTop: bold ? 4 : 0,
-      fontFamily: 'var(--font-mono)', fontSize: 14,
-    }}>
-      <span style={{ fontFamily: 'var(--font-ui)', fontWeight: bold ? 700 : 500 }}>{label}</span>
+    <div className={`flex justify-between py-1.5 font-mono text-sm ${bold ? 'font-bold border-t border-dashed border-line mt-1' : ''} ${color || 'text-ink'}`}>
+      <span className={`font-sans ${bold ? 'font-bold' : 'font-medium'}`}>{label}</span>
       <span>{value}</span>
     </div>
   )
 
+  const box = 'rounded-md bg-surface-2 px-4 py-3.5 mb-4'
+  const boxTitle = 'text-xs font-semibold text-muted mb-2.5'
+
   return (
-    <Modal title="Close Day — Z-Report" onClose={onClose}>
+    <Modal title="Close day: Z-report" onClose={onClose} className="max-w-[480px]">
       <div className="z-report-printable">
 
-        {/* date picker */}
-        <label className="field" style={{ marginBottom: 16 }}>
+        <label className="field mb-4">
           <span>Period</span>
           <input type="date" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} />
         </label>
 
         {loading ? (
-          <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Loading…</p>
+          <p className="text-muted text-center py-5">Loading...</p>
         ) : (
           <>
             {/* revenue breakdown */}
-            <div style={{
-              background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
+            <div className={box}>
+              <div className={boxTitle}>
                 Sales ({sales.length} transaction{sales.length === 1 ? '' : 's'}{voidCount > 0 ? `, ${voidCount} void${voidCount > 1 ? 's' : ''}` : ''})
               </div>
               <Row label="Cash"   value={money(cashSales)} />
@@ -128,48 +121,40 @@ export default function DayClose({ money, onClose }) {
             </div>
 
             {/* cash reconciliation */}
-            <div style={{
-              background: 'var(--surface-2)', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>
-                Cash reconciliation
-              </div>
-              <label className="field" style={{ marginBottom: 10 }}>
+            <div className={box}>
+              <div className={boxTitle}>Cash reconciliation</div>
+              <label className="field mb-2.5">
                 <span>Opening float (cash in drawer at start of day)</span>
                 <input
                   type="number" min="0" value={openingFloat}
                   onChange={e => setOpeningFloat(e.target.value)}
-                  style={{ fontFamily: 'var(--font-mono)' }}
+                  className="font-mono"
                 />
               </label>
               <Row label="+ Cash sales" value={money(cashSales)} />
               <Row label="= Expected in drawer" value={money(expectedCash)} bold />
 
-              <label className="field" style={{ marginTop: 14, marginBottom: 0 }}>
+              <label className="field mt-3.5 mb-0">
                 <span>Actual cash counted</span>
                 <input
                   type="number" min="0"
                   value={actualCash}
                   onChange={e => setActualCash(e.target.value)}
-                  placeholder="Count the drawer…"
-                  style={{ fontFamily: 'var(--font-mono)' }}
+                  placeholder="Count the drawer"
+                  className="font-mono"
                 />
               </label>
 
               {variance !== null && (
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  marginTop: 10, padding: '10px 14px', borderRadius: 8,
-                  background: variance === 0 ? 'var(--green-tint)' : variance > 0 ? 'var(--amber-tint)' : 'var(--red-tint)',
-                  border: `1.5px solid ${variance === 0 ? 'rgba(26,122,72,.2)' : variance > 0 ? 'rgba(208,140,10,.25)' : 'rgba(192,57,43,.25)'}`,
-                }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>
+                <div className={`flex justify-between items-center mt-2.5 px-3.5 py-2.5 rounded-sm border ${
+                  variance === 0 ? 'bg-green-tint border-green/25' : variance > 0 ? 'bg-amber-tint border-amber-warn/30' : 'bg-red-tint border-red/25'
+                }`}>
+                  <span className="font-bold text-[13px]">
                     {variance === 0 ? 'Balanced' : variance > 0 ? 'Over' : 'Short'}
                   </span>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 16,
-                    color: variance === 0 ? 'var(--green)' : variance > 0 ? 'var(--amber-warn)' : 'var(--red)',
-                  }}>
+                  <span className={`font-mono font-bold text-base ${
+                    variance === 0 ? 'text-green' : variance > 0 ? 'text-amber-warn' : 'text-red'
+                  }`}>
                     {variance > 0 ? '+' : ''}{money(variance)}
                   </span>
                 </div>
@@ -180,44 +165,29 @@ export default function DayClose({ money, onClose }) {
               <span>Notes</span>
               <input
                 value={notes} onChange={e => setNotes(e.target.value)}
-                placeholder="Optional — issues, explanations…"
+                placeholder="Optional: issues, explanations"
               />
             </label>
 
-            {error && (
-              <div style={{
-                background: 'var(--red-tint)', border: '1.5px solid rgba(192,57,43,.3)',
-                borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 13, color: 'var(--red)',
-              }}>
-                {error}
-              </div>
-            )}
+            {error && <div className="alert-error">{error}</div>}
 
             {saved ? (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{
-                  flex: 1, background: 'var(--green-tint)', border: '1.5px solid rgba(26,122,72,.25)',
-                  borderRadius: 10, padding: '12px 16px', textAlign: 'center',
-                  fontWeight: 700, color: 'var(--green)',
-                }}>
-                  Z-report saved ✓
+              <div className="flex gap-2.5">
+                <div className="flex-1 rounded-full bg-green-tint border border-green/25 py-2.5 text-center font-bold text-green">
+                  Z-report saved
                 </div>
-                <button className="btn ghost" onClick={handlePrint} style={{ flex: 1 }}>
+                <Button variant="outline" className="flex-1 h-auto" onClick={handlePrint}>
                   Print
-                </button>
+                </Button>
               </div>
             ) : (
-              <div className="z-report-actions" style={{ display: 'flex', gap: 10 }}>
-                <button className="btn ghost" style={{ flex: 1 }} onClick={onClose}>
+              <div className="z-report-actions flex gap-2.5">
+                <Button variant="outline" className="flex-1" onClick={onClose}>
                   Cancel
-                </button>
-                <button
-                  className="btn pay" style={{ flex: 1 }}
-                  disabled={saving}
-                  onClick={handleSave}
-                >
-                  {saving ? 'Saving…' : 'Save Z-report'}
-                </button>
+                </Button>
+                <Button className="flex-1" disabled={saving} onClick={handleSave}>
+                  {saving ? 'Saving...' : 'Save Z-report'}
+                </Button>
               </div>
             )}
           </>

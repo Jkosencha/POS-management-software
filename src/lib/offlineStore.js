@@ -50,7 +50,9 @@ export async function getCachedProducts() {
 
 export async function enqueueSale(sale) {
   const db = await openDB()
-  const tx = db.transaction('pending_sales', 'readwrite')
+  // 'strict': the browser only reports success once the sale is flushed to
+  // disk, so a power cut right after the receipt shows can't lose it
+  const tx = db.transaction('pending_sales', 'readwrite', { durability: 'strict' })
   tx.objectStore('pending_sales').add(sale)
   return awaitTx(tx)
 }

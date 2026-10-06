@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { Search, Minus, Plus, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { fetchAll } from '../lib/fetchAll'
 import { vatFromTotal } from '../lib/money'
 import { useBarcode } from '../lib/useBarcode'
-import { useSession } from '../auth/useSession'
 import { cacheProducts, getCachedProducts, enqueueSale } from '../lib/offlineStore'
 import PaymentModal from './PaymentModal'
 import ReceiptModal from './ReceiptModal'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
-export default function Register({ settings, money, isOnline, onSaleQueued }) {
-  const { session } = useSession()
+// Cashiers may discount up to 20%; managers/owners up to 100% (also enforced in checkout())
+export const MAX_DISCOUNT = { cashier: 20, manager: 100, owner: 100 }
+
+export default function Register({ settings, money, isOnline, onSaleQueued, role = 'cashier', userId }) {
+  const maxDiscount = MAX_DISCOUNT[role] ?? 20
   const [products, setProducts]     = useState([])
   const [cart, setCart]             = useState([])
   const [search, setSearch]         = useState('')
@@ -25,13 +31,20 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
       if (cached) setProducts(cached)
       return
     }
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('active', true)
-      .order('category')
-      .order('name')
-    const list = data || []
+    const [{ data }, { data: inactiveCats }] = await Promise.all([
+      fetchAll(() => supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .order('category')
+        .order('name')
+        .order('id')),
+      // Errors (e.g. migration 009 not run yet) just mean nothing is hidden
+      supabase.from('categories').select('name').eq('active', false),
+    ])
+    // Products in a deactivated category are hidden from the register
+    const hidden = new Set((inactiveCats || []).map(c => c.name))
+    const list = (data || []).filter(p => !hidden.has(p.category))
     setProducts(list)
     cacheProducts(list).catch(() => {})  // best-effort cache update
   }, [])
@@ -56,7 +69,7 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
     if (product) {
       addToCartDirect(product)
     } else {
-      flash(`Code "${code}" not found — add it in Inventory`)
+      flash(`Code "${code}" not found. Add it in Inventory.`)
     }
   }, [products]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -103,12 +116,21 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
       change:      method === 'Cash' ? tendered - total : 0,
       mpesa_ref:   ref || '',
       discount_pct: discountPct,
+      // Keeps an offline sale credited to whoever rang it up, even if
+      // someone else is logged in when it syncs
+      cashier_id:   userId,
     }
+    // Unique per sale: lets the server ignore a retried duplicate
+    const saleId = crypto.randomUUID()
+    const ringTime = new Date().toISOString()
 
-    /* ---- offline path ---- */
-    if (!navigator.onLine) {
-      const saleId = crypto.randomUUID()
-      await enqueueSale({ id: saleId, items, payment, created_at: new Date().toISOString() })
+    /* ---- offline path (also used when the network drops mid-checkout) ---- */
+    const queueOffline = async () => {
+      await enqueueSale({
+        id: saleId, items, payment, created_at: ringTime,
+        // Human-readable copy for the "offline sales" review screen
+        summary: { total, lines: cartLines.map(l => ({ name: l.product.name, qty: l.qty })) },
+      })
 
       // Optimistically deduct stock so the cashier can't oversell while offline
       setProducts(prev => prev.map(p => {
@@ -137,14 +159,21 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
       setReceipt(offlineReceipt)
       onSaleQueued?.()
       setCheckingOut(false)
-      return
     }
+
+    if (!navigator.onLine) return queueOffline()
 
     /* ---- online path ---- */
     const { data, error } = await supabase.rpc('checkout', {
       p_items:   items,
-      p_payment: payment,
+      p_payment: { ...payment, client_id: saleId },
     })
+
+    // No response at all = network failure: the sale may or may not have
+    // reached the server. Queue it; client_id stops it being recorded twice.
+    if (error && !error.code && /fetch|network/i.test(error.message || '')) {
+      return queueOffline()
+    }
 
     if (error) {
       flash(error.message)
@@ -183,49 +212,41 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
   })
 
   return (
-    <div className="register flex h-screen max-[900px]:flex-col max-[900px]:h-auto">
-      <section className="flex-1 min-w-0 p-5 max-[900px]:p-3.5 overflow-y-auto">
+    <div className="flex h-full max-[900px]:flex-col max-[900px]:h-auto">
+      <section className="flex-1 min-w-0 p-4 sm:p-5 overflow-y-auto">
         {!isOnline && (
-          <div className="bg-amber-tint border-[1.5px] border-amber-warn rounded-lg px-3 py-2 mb-3 text-[13px] text-amber-text font-semibold">
-            Offline mode — using cached products. Sales are queued and will sync automatically.
+          <div className="alert-warn">
+            Offline mode: using cached products. Sales are queued and will sync automatically.
           </div>
         )}
-        <input
-          className="w-full border border-line rounded-[10px] bg-surface text-ink outline-none transition-colors focus:border-accent"
-          style={{
-            padding: '11px 14px 11px 40px',
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238990a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E\")",
-            backgroundRepeat: 'no-repeat', backgroundPosition: '13px center',
-          }}
-          placeholder="Search by name or SKU…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="flex gap-1.75 flex-wrap my-3.5">
+        <div className="relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+          <Input
+            className="pl-10 rounded-full h-11 shadow-sm border-transparent"
+            placeholder="Search by name or SKU..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-1.5 flex-wrap my-3.5">
           {categories.map(c => (
-            <button
-              key={c}
-              className={`border rounded-full py-1.25 px-3.5 text-[12.5px] font-semibold transition-all ${
-                activeCat === c ? 'bg-accent border-accent text-white' : 'border-line bg-surface text-muted hover:border-accent hover:text-accent'
-              }`}
-              onClick={() => setActiveCat(c)}
-            >
+            <button key={c} className={`cat ${activeCat === c ? 'on' : ''}`} onClick={() => setActiveCat(c)}>
               {c}
             </button>
           ))}
         </div>
-        <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))' }}>
+        <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
           {visibleProducts.map(p => (
             <button
               key={p.id}
-              className={`bg-surface border border-line rounded-md text-left flex flex-col gap-2 min-h-[90px] shadow-sm transition-all hover:border-accent hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm ${p.stock <= 0 ? 'opacity-45 cursor-not-allowed' : ''}`}
-              style={{ padding: '14px 13px' }}
+              className={`bg-surface rounded-md text-left flex flex-col gap-2 min-h-[96px] p-3.5 shadow-sm border border-transparent transition-all hover:border-accent hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 ${p.stock <= 0 ? 'opacity-45 cursor-not-allowed' : ''}`}
               onClick={() => addToCartDirect(p)}
             >
-              <div className="font-semibold text-[13.5px] leading-[1.25] text-ink">{p.name}</div>
-              <div className="mt-auto flex justify-between items-baseline">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted">{p.category}</div>
+              <div className="font-semibold text-[13.5px] leading-[1.25] text-ink -mt-1">{p.name}</div>
+              <div className="mt-auto flex justify-between items-baseline gap-1">
                 <span className="font-mono font-bold text-sm text-accent">{money(p.price)}</span>
-                <span className={`text-[11px] ${p.stock <= p.low_at ? 'text-amber-warn font-bold' : 'text-muted'}`}>
+                <span className={`text-[11px] ${p.stock <= p.low_at ? 'text-red font-bold' : 'text-muted'}`}>
                   {p.stock <= 0 ? 'Out' : `${p.stock} left`}
                 </span>
               </div>
@@ -233,27 +254,21 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
           ))}
           {visibleProducts.length === 0 && (
             <div className="col-span-full py-12 px-2.5 text-center text-muted text-sm">
-              No products match — try a different search or add it in Inventory.
+              No products match. Try a different search or add it in Inventory.
             </div>
           )}
         </div>
       </section>
 
-      <aside
-        className="receipt-cart w-[340px] max-[900px]:w-auto shrink-0 bg-surface shadow-md flex flex-col font-mono relative border border-line max-[900px]:rounded-md max-[900px]:max-h-none"
-        style={{
-          margin: '16px 16px 0 0', borderRadius: 'var(--r-md) var(--r-md) 0 0',
-          padding: '18px 18px 0', maxHeight: 'calc(100vh - 16px)', borderBottom: 0,
-        }}
-      >
+      <aside className="receipt-cart m-4 ml-0 max-[900px]:m-4 max-[900px]:mt-0 rounded-lg p-4.5 pb-0 overflow-hidden">
         <div className="flex justify-between text-[10.5px] tracking-[.08em] text-muted uppercase">
           <span>{settings.store_name.toUpperCase()}</span>
           <span>{new Date().toLocaleDateString('en-KE')}</span>
         </div>
-        <hr className="border-0 border-t-[1.5px] border-dashed border-line my-2.5" />
+        <hr className="rc-rule" />
         <div className="flex-1 overflow-y-auto min-h-[60px]">
           {cartLines.length === 0 && (
-            <div className="text-muted text-sm py-7 text-center font-mono">Tap products to ring them up</div>
+            <div className="text-muted text-sm py-7 text-center">Tap products to ring them up</div>
           )}
           {cartLines.map(l => (
             <div key={l.productId} className="py-2">
@@ -261,102 +276,80 @@ export default function Register({ settings, money, isOnline, onSaleQueued }) {
                 <span>{l.product.name}</span>
                 <span className="whitespace-nowrap">{money(l.line_total)}</span>
               </div>
-              <div className="flex items-center gap-1.75 mt-1.25">
+              <div className="flex items-center gap-1.5 mt-1.5">
                 <button
-                  className="w-6 h-6 rounded-sm border-[1.5px] border-line bg-surface-2 text-ink text-[15px] leading-none font-bold transition-colors hover:border-accent hover:bg-accent-tint"
+                  className="size-6 rounded-full grid place-items-center bg-surface-2 text-ink transition-colors hover:bg-accent-tint hover:text-accent"
                   onClick={() => setQty(l.productId, l.qty - 1)}
+                  aria-label="Decrease quantity"
                 >
-                  −
+                  <Minus size={12} />
                 </button>
                 <span className="min-w-5 text-center font-bold text-sm">{l.qty}</span>
                 <button
-                  className="w-6 h-6 rounded-sm border-[1.5px] border-line bg-surface-2 text-ink text-[15px] leading-none font-bold transition-colors hover:border-accent hover:bg-accent-tint"
+                  className="size-6 rounded-full grid place-items-center bg-surface-2 text-ink transition-colors hover:bg-accent-tint hover:text-accent"
                   onClick={() => setQty(l.productId, l.qty + 1)}
+                  aria-label="Increase quantity"
                 >
-                  +
+                  <Plus size={12} />
                 </button>
                 <span className="text-[11px] text-muted">@ {money(l.product.price)}</span>
                 <button
-                  className="ml-auto border-0 bg-transparent text-muted text-xs hover:text-red"
-                  style={{ padding: '2px 4px' }}
+                  className="ml-auto size-6 rounded-full grid place-items-center text-muted hover:text-red hover:bg-red-tint"
                   onClick={() => setQty(l.productId, 0)}
+                  aria-label="Remove item"
                 >
-                  ✕
+                  <X size={13} />
                 </button>
               </div>
             </div>
           ))}
         </div>
-        <hr className="border-0 border-t-[1.5px] border-dashed border-line my-2.5" />
-        <div className="flex justify-between text-sm text-ink" style={{ padding: '3px 0' }}>
+        <hr className="rc-rule" />
+        <div className="rc-row text-ink">
           <span>Subtotal</span><span>{money(subtotal)}</span>
         </div>
-        <div className="flex justify-between text-sm text-ink" style={{ padding: '3px 0' }}>
+        <div className="rc-row text-ink">
           <span>
             Discount{' '}
             <input
-              className="w-11 border border-line rounded-[5px] text-xs text-right bg-surface-2 text-ink outline-none focus:border-accent"
-              style={{ padding: '2px 4px', fontFamily: 'inherit' }}
-              type="number" min="0" max="100" value={discountPct}
-              onChange={e => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+              className="w-11 border border-line rounded-[6px] text-xs text-right bg-surface-2 text-ink outline-none focus:border-accent px-1 py-0.5"
+              style={{ fontFamily: 'inherit' }}
+              type="number" min="0" max={maxDiscount} value={discountPct}
+              onChange={e => setDiscountPct(Math.max(0, Math.min(maxDiscount, Number(e.target.value) || 0)))}
+              title={`Up to ${maxDiscount}%`}
             />
-            %
+            %{maxDiscount < 100 && <span className="text-[10.5px] text-muted ml-1">(max {maxDiscount}%)</span>}
           </span>
           <span>−{money(discountAmt)}</span>
         </div>
-        <div className="flex justify-between text-xl font-bold text-accent" style={{ padding: '6px 0 2px' }}>
+        <div className="flex justify-between text-xl font-bold text-accent pt-1.5 pb-0.5">
           <span>TOTAL</span><span>{money(total)}</span>
         </div>
         <div className="flex justify-between text-muted text-[11.5px]">
           <span>VAT {settings.tax_rate}% (incl.)</span>
           <span>{money(vatIncluded.toFixed(2))}</span>
         </div>
-        <div className="flex gap-2.5" style={{ padding: '14px 0 18px' }}>
-          <button
-            className={`border-0 rounded-[10px] font-bold text-sm bg-transparent border-[1.5px] border-line text-muted ${
-              !cartLines.length ? 'opacity-50 cursor-not-allowed' : 'hover:border-red hover:text-red'
-            }`}
-            style={{ padding: '11px 16px' }}
-            onClick={clearCart}
-            disabled={!cartLines.length}
-          >
+        <div className="flex gap-2.5 pt-3.5 pb-4.5 font-sans">
+          <Button variant="outline" size="lg" onClick={clearCart} disabled={!cartLines.length}>
             Clear
-          </button>
-          <button
-            className="border-0 rounded-[10px] font-bold text-sm text-white flex-1 disabled:bg-surface-3 disabled:text-muted disabled:cursor-not-allowed disabled:shadow-none"
-            style={{
-              padding: '11px 16px',
-              background: (!cartLines.length || checkingOut) ? undefined : 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
-              boxShadow: (!cartLines.length || checkingOut) ? undefined : '0 2px 8px rgba(184,150,58,.22), 0 4px 16px rgba(184,150,58,.14)',
-            }}
+          </Button>
+          <Button
+            size="lg" className="flex-1"
             onClick={() => cartLines.length && setPayOpen(true)}
             disabled={!cartLines.length || checkingOut}
           >
             Charge {money(total)}
-          </button>
+          </Button>
         </div>
-        <div
-          className="h-3 -mx-4.5 translate-y-3"
-          style={{
-            background:
-              'radial-gradient(circle at 6px 12px, var(--bg) 5px, transparent 5px) 0 0 / 12px 12px repeat-x, var(--surface)',
-          }}
-        />
       </aside>
 
       {payOpen && (
-        <PaymentModal total={total} money={money} session={session} onClose={() => setPayOpen(false)} onComplete={completeSale} />
+        <PaymentModal total={total} money={money} onClose={() => setPayOpen(false)} onComplete={completeSale} />
       )}
       {receipt && (
         <ReceiptModal sale={receipt} settings={settings} money={money} onClose={() => setReceipt(null)} />
       )}
-      {toast && (
-        <div className="fixed left-1/2 bg-sb-bg text-sb-text rounded-xl font-semibold text-sm shadow-lg whitespace-nowrap z-[99]"
-          style={{ bottom: 24, transform: 'translateX(-50%)', border: '1px solid rgba(255,255,255,.1)', padding: '11px 22px' }}
-        >
-          {toast}
-        </div>
-      )}
+      {toast && <div className="toast">{toast}</div>}
     </div>
   )
 }

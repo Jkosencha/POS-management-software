@@ -1,5 +1,5 @@
 // Tries to print via the local ESC/POS bridge (Node service on the till PC).
-// Falls back gracefully — callers should always have a CSS-print fallback.
+// Falls back gracefully: callers should always have a CSS-print fallback.
 
 const BRIDGE_URL = 'http://127.0.0.1:8080'
 
