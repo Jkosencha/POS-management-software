@@ -1,5 +1,5 @@
 -- ============================================================
--- 003_seed.sql — sample minimart products
+-- 003_seed.sql: sample minimart products
 -- Run AFTER 001_schema.sql
 -- ============================================================
 

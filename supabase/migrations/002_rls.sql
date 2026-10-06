@@ -1,5 +1,5 @@
 -- ============================================================
--- 002_rls.sql — Row Level Security policies
+-- 002_rls.sql: Row Level Security policies
 -- Run AFTER 001_schema.sql
 -- ============================================================
 
@@ -66,7 +66,7 @@ create policy "sales_select" on sales
     or get_my_role() in ('manager', 'owner')
   );
 
--- No direct insert — must go through checkout() RPC (security definer)
+-- No direct insert: must go through checkout() RPC (security definer)
 
 -- ============================================================
 -- sale_items
