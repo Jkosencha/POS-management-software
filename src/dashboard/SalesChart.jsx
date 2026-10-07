@@ -97,7 +97,7 @@ export default function SalesChart({ money, showCost = true }) {
     <div>
       <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
         <div>
-          <h3 className="m-0 text-[15px] font-bold text-ink">{showCost ? 'Revenue vs. Cost' : 'My sales'}</h3>
+          <h3 className="m-0 text-[15px] font-bold text-ink">{showCost ? 'Revenue vs. Cost' : 'Sales'}</h3>
           <div className="flex gap-4 mt-2">
             <LegendDot color="var(--chart-1)" label="Revenue" />
             {showCost && <LegendDot color="var(--chart-2)" label="Cost" />}
