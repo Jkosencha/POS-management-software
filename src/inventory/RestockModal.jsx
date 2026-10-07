@@ -13,7 +13,10 @@ const REASONS = [
   { value: 'spoilage',   label: 'Spoilage',   sign: -1, hint: 'Damaged or expired items removed' },
 ]
 
-export default function RestockModal({ product, partners = [], onClose, onDone }) {
+// canAdjust: managers/owners also get return / adjustment / spoilage;
+// cashiers can only receive stock
+export default function RestockModal({ product, partners = [], canAdjust = true, onClose, onDone }) {
+  const reasons = canAdjust ? REASONS : REASONS.filter(r => r.value === 'restock')
   const [reason, setReason] = useState('restock')
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
@@ -45,18 +48,11 @@ export default function RestockModal({ product, partners = [], onClose, onDone }
       reason,
       note: note.trim() || null,
       unit_cost: isRestock ? unitCostNum : null,
+      // The database copies a restock's buying price + supplier onto the product
+      supplier: isRestock ? supplier.trim() || null : null,
       ...(owner != null ? { partner_id: owner } : {}),
     })
     if (error) { setSaving(false); return setError(error.message) }
-
-    // Restocking updates the product's current cost basis + supplier going forward
-    if (isRestock && (unitCostNum != null || supplier.trim())) {
-      const { error: prodError } = await supabase.from('products').update({
-        ...(unitCostNum != null ? { cost_price: unitCostNum } : {}),
-        ...(supplier.trim() ? { supplier: supplier.trim() } : {}),
-      }).eq('id', product.id)
-      if (prodError) { setSaving(false); return setError(prodError.message) }
-    }
 
     setSaving(false)
     onDone()
@@ -64,8 +60,8 @@ export default function RestockModal({ product, partners = [], onClose, onDone }
 
   return (
     <Modal title={`Restock: ${product.name}`} onClose={onClose}>
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {REASONS.map(r => (
+      <div className={`flex flex-wrap gap-1.5 mb-3 ${reasons.length === 1 ? 'hidden' : ''}`}>
+        {reasons.map(r => (
           <button
             key={r.value}
             className={`cat ${reason === r.value ? 'on' : ''}`}
