@@ -14,8 +14,8 @@ import StockHistoryModal from './StockHistoryModal'
 
 const EMPTY_PRODUCT = { name: '', sku: '', barcode: '', category: '', price: '', stock: 0, low_at: 5 }
 
-// canManage = manager/owner. Cashiers get a read-only stock list: RLS doesn't
-// let them change products or stock, and owner/cost details stay hidden.
+// canManage = manager/owner. Cashiers can add products and restock, but not
+// edit, deactivate, adjust or see stock history / owners.
 export default function Inventory({ money, canManage = true, openAdd, onIntentHandled, onStockChanged }) {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([]) // [{ name, active }]
@@ -66,7 +66,6 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
 
   /* ---- barcode scanner: scan → open restock form (cashiers: search) ---- */
   const handleScan = useCallback((code) => {
-    if (!canManage) { setQ(code); return }
     const product = products.find(p =>
       (p.barcode && p.barcode === code) || (p.sku && p.sku === code)
     )
@@ -76,7 +75,7 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
       flash(`Code "${code}" not found. Add it as a new product.`)
       setEditProduct({ ...EMPTY_PRODUCT, barcode: code })
     }
-  }, [products, canManage])
+  }, [products])
 
   // Pause scanner while any modal is open
   useBarcode(handleScan, !editProduct && !restockProduct && !historyProduct)
@@ -146,11 +145,9 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
     <div className="page">
       <header className="page-head">
         <h1>Inventory</h1>
-        {canManage && (
-          <Button onClick={() => setEditProduct({ ...EMPTY_PRODUCT })}>
-            <Plus /> Add product
-          </Button>
-        )}
+        <Button onClick={() => setEditProduct({ ...EMPTY_PRODUCT })}>
+          <Plus /> Add product
+        </Button>
       </header>
 
       <div className="flex flex-wrap gap-2.5 items-center mb-4">
@@ -187,7 +184,7 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
               <TableHead className="text-right">Selling price</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               {canManage && <TableHead className="max-lg:hidden">Owners</TableHead>}
-              {canManage && <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>}
+              <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -217,7 +214,7 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
                       ))}
                     </div>
                   </TableCell>}
-                  {canManage && <TableCell>
+                  <TableCell>
                     <div className="flex gap-1 justify-end">
                       {p.active ? (
                         <Button size="sm" variant="ghost" className="text-green hover:text-green" onClick={() => setRestockProduct(p)}>
@@ -228,16 +225,20 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
                           Reactivate
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => setHistoryProduct(p)}>History</Button>
-                      <Button size="sm" variant="ghost" className="text-accent hover:text-accent" onClick={() => setEditProduct(p)}>Edit</Button>
+                      {canManage && (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={() => setHistoryProduct(p)}>History</Button>
+                          <Button size="sm" variant="ghost" className="text-accent hover:text-accent" onClick={() => setEditProduct(p)}>Edit</Button>
+                        </>
+                      )}
                     </div>
-                  </TableCell>}
+                  </TableCell>
                 </TableRow>
               )
             })}
             {list.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={canManage ? 7 : 5} className="empty-grid">
+                <TableCell colSpan={canManage ? 7 : 6} className="empty-grid">
                   {filter === 'low' ? 'No low-stock items. All stocked up.'
                     : filter === 'inactive' ? 'No inactive products.' : 'Nothing here yet.'}
                 </TableCell>
@@ -262,6 +263,7 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
         <RestockModal
           product={restockProduct}
           partners={partners}
+          canAdjust={canManage}
           onClose={() => setRestockProduct(null)}
           onDone={() => {
             setRestockProduct(null)

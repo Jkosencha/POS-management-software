@@ -54,8 +54,7 @@ function Card({ title, action, children, className = '' }) {
   )
 }
 
-// Cashiers see the same dashboard scoped to their own sales: RLS only returns
-// sales they rang up, and cost/profit/partner figures are hidden.
+// Cashiers see the same dashboard with cost/profit/partner figures hidden.
 export default function Dashboard({ money, onNavigate, role }) {
   const isAdmin = role === 'manager' || role === 'owner'
   const [todaySales, setTodaySales]   = useState([])
@@ -135,15 +134,10 @@ export default function Dashboard({ money, onNavigate, role }) {
 
       {/* ================= main column ================= */}
       <div className="grid gap-4 min-w-0">
-        {!isAdmin && (
-          <div className="text-sm text-ink-2 -mb-1">
-            Your sales today. Only sales you rang up are shown here.
-          </div>
-        )}
         {/* stat cards (pastel colors kept) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard
-            icon={Wallet} label={isAdmin ? 'Revenue' : 'My revenue'} value={money(revenue)}
+            icon={Wallet} label="Revenue" value={money(revenue)}
             sub={`${todaySales.length} sale${todaySales.length !== 1 ? 's' : ''} today`}
             colorClass="bg-mint-bg text-mint-fg"
             onClick={() => onNavigate('sales')}
@@ -174,7 +168,7 @@ export default function Dashboard({ money, onNavigate, role }) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card
-            title={isAdmin ? 'Top products today' : 'My top products today'}
+            title="Top products today"
             action={isAdmin && <button className="link" onClick={() => onNavigate('reports')}>Reports</button>}
           >
             {topProducts.length === 0 ? (
@@ -226,7 +220,7 @@ export default function Dashboard({ money, onNavigate, role }) {
       {/* ================= right column ================= */}
       <div className="grid gap-4 min-w-0 md:grid-cols-2 xl:grid-cols-1">
         <Card
-          title={isAdmin ? 'Recent sales' : 'My recent sales'}
+          title="Recent sales"
           action={<button className="link" onClick={() => onNavigate('sales')}>View all</button>}
           className="md:col-span-2 xl:col-span-1"
         >
@@ -260,7 +254,7 @@ export default function Dashboard({ money, onNavigate, role }) {
         </Card>
 
         <Card>
-          <CategoryBreakdown money={money} title={isAdmin ? 'Sales by category' : 'My sales by category'} />
+          <CategoryBreakdown money={money} title="Sales by category" />
         </Card>
 
         {isAdmin && (

@@ -6,6 +6,7 @@ import { todayKey, daysAgoKey, startOfDay, startOfNextDay } from '../lib/dates'
 import { Input } from '@/components/ui/input'
 import ReceiptModal from '../register/ReceiptModal'
 import VoidModal from './VoidModal'
+import PasswordConfirmDialog from '../components/PasswordConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -21,6 +22,9 @@ export default function SalesHistory({ money, settings, role }) {
   const [sales, setSales]     = useState([])
   const [viewSale, setViewSale] = useState(null)
   const [voidSale, setVoidSale] = useState(null)
+  const [unvoidSale, setUnvoidSale] = useState(null)
+  const [deleteSale, setDeleteSale] = useState(null)
+  const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
   const [preset, setPreset]   = useState('Today')
   const [from, setFrom]       = useState(todayKey())
@@ -51,7 +55,7 @@ export default function SalesHistory({ money, settings, role }) {
 
   const needle = q.trim().toLowerCase()
   const shown = sales.filter(s =>
-    (method === 'All' || s.method === method) &&
+    (method === 'All' || (method === 'Voided' ? s.status === 'voided' : s.method === method)) &&
     (!needle || s.receipt_no.toLowerCase().includes(needle) ||
       s.items.some(i => i.name.toLowerCase().includes(needle)))
   )
@@ -64,7 +68,31 @@ export default function SalesHistory({ money, settings, role }) {
     ))
   }
 
-  const canVoid = role === 'manager' || role === 'owner'
+  // Everyone can void and un-void; only managers/owners delete voided sales
+  const canDelete = role === 'manager' || role === 'owner'
+  const voidedCount = sales.filter(s => s.status === 'voided').length
+
+  const flash = msg => { setToast(msg); setTimeout(() => setToast(null), 2800) }
+
+  const rpcError = (error, migration) =>
+    error.code === 'PGRST202' ? `Run migration ${migration} in the Supabase SQL editor first.` : error.message
+
+  // Return an error message for the confirm dialog, or nothing on success
+  async function handleUnvoid() {
+    const s = unvoidSale
+    const { error } = await supabase.rpc('unvoid_sale', { p_sale_id: s.id })
+    if (error) return rpcError(error, '014')
+    setSales(prev => prev.map(x => x.id === s.id ? { ...x, status: 'completed', void_reason: null } : x))
+    flash(`${s.receipt_no} restored`)
+  }
+
+  async function handleDeleteVoided() {
+    const s = deleteSale
+    const { error } = await supabase.rpc('delete_voided_sale', { p_sale_id: s.id })
+    if (error) return rpcError(error, '014')
+    setSales(prev => prev.filter(x => x.id !== s.id))
+    flash(`${s.receipt_no} deleted`)
+  }
 
   return (
     <div className="page">
@@ -89,7 +117,7 @@ export default function SalesHistory({ money, settings, role }) {
           <Input className="pl-10 rounded-full" placeholder="Search receipt no. or product..." value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <div className="flex gap-1.5">
-          {['All', 'Cash', 'M-Pesa', 'Card'].map(m => (
+          {['All', 'Cash', 'M-Pesa', 'Card', ...(voidedCount ? ['Voided'] : [])].map(m => (
             <button key={m} className={`cat ${method === m ? 'on' : ''}`} onClick={() => setMethod(m)}>{m}</button>
           ))}
         </div>
@@ -138,7 +166,7 @@ export default function SalesHistory({ money, settings, role }) {
                   <TableCell>
                     <span className="inline-flex items-center gap-1.5">
                       {s.method}
-                      {voided && <Badge variant="destructive">VOID</Badge>}
+                      {voided && <Badge variant="destructive" title={s.void_reason ? `Reason: ${s.void_reason}` : undefined}>VOID</Badge>}
                     </span>
                   </TableCell>
                   <TableCell className="num font-semibold">{money(s.total)}</TableCell>
@@ -147,9 +175,19 @@ export default function SalesHistory({ money, settings, role }) {
                       <Button size="sm" variant="ghost" className="text-accent hover:text-accent" onClick={() => setViewSale(s)}>
                         Receipt
                       </Button>
-                      {canVoid && !voided && (
+                      {!voided && (
                         <Button size="sm" variant="ghost" className="text-red hover:text-red hover:bg-red-tint" onClick={() => setVoidSale(s)}>
                           Void
+                        </Button>
+                      )}
+                      {voided && (
+                        <Button size="sm" variant="ghost" className="text-green hover:text-green" onClick={() => setUnvoidSale(s)}>
+                          Un-void
+                        </Button>
+                      )}
+                      {voided && canDelete && (
+                        <Button size="sm" variant="ghost" className="text-red hover:text-red hover:bg-red-tint" onClick={() => setDeleteSale(s)}>
+                          Delete
                         </Button>
                       )}
                     </div>
@@ -178,6 +216,26 @@ export default function SalesHistory({ money, settings, role }) {
           onVoided={handleVoided}
         />
       )}
+
+      <PasswordConfirmDialog
+        open={Boolean(unvoidSale)}
+        onOpenChange={open => { if (!open) setUnvoidSale(null) }}
+        title={`Un-void ${unvoidSale?.receipt_no}?`}
+        description={unvoidSale ? `The sale (${money(unvoidSale.total)}) counts again in totals and reports, and its items are taken out of stock again.` : ''}
+        confirmLabel="Un-void sale"
+        onConfirm={handleUnvoid}
+      />
+
+      <PasswordConfirmDialog
+        open={Boolean(deleteSale)}
+        onOpenChange={open => { if (!open) setDeleteSale(null) }}
+        title={`Delete ${deleteSale?.receipt_no} permanently?`}
+        description="This voided sale and its receipt are removed for good. Stock is not changed (it was already returned when the sale was voided)."
+        confirmLabel="Delete sale"
+        onConfirm={handleDeleteVoided}
+      />
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   )
 }
