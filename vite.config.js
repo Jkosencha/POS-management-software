@@ -20,9 +20,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.png', 'pwa-512.png', 'pwa-maskable-512.png', 'apple-touch-icon.png', 'favicon.svg'],
       manifest: {
-        name: 'Sunrise Minimart POS',
-        short_name: 'Sunrise POS',
-        description: 'Point of sale, stock, and reports for Sunrise Minimart',
+        name: 'Savannah Minimart POS',
+        short_name: 'Savannah POS',
+        description: 'Point of sale, stock, and reports for Savannah Minimart',
         theme_color: '#7c6cf0',
         background_color: '#f6f6fb',
         display: 'standalone',
