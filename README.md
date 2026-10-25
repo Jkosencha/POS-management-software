@@ -1,4 +1,4 @@
-# Sunrise Minimart: Point of Sale System
+# Savannah Minimart: Point of Sale System
 
 A full-stack, cloud-backed Point of Sale system built for a minimart in Kenya. Runs on any device with a browser, supports M-Pesa payments, works offline, and prints 80mm thermal receipts.
 

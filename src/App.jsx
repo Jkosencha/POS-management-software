@@ -35,7 +35,7 @@ const OfflineQueue = lazy(() => import('./register/OfflineQueue'))
 const PageLoading = () => <div className="p-6 text-muted text-sm">Loading...</div>
 
 const DEFAULT_SETTINGS = {
-  store_name: 'Sunrise Minimart',
+  store_name: 'Savannah Minimart',
   currency: 'KSh',
   tax_rate: 16,
   receipt_footer: 'Thank you, karibu tena!',

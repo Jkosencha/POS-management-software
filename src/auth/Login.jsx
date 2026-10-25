@@ -41,7 +41,7 @@ export default function Login() {
 
   return (
     <AuthShell
-      title="Sunrise Minimart"
+      title="Savannah Minimart"
       subtitle={mode === 'signin' ? 'Sign in to the point of sale' : 'Reset your password'}
     >
       {(error || blockedMsg) && <div className="alert-error">{error || blockedMsg}</div>}
