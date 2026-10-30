@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { verifyPassword } from '../lib/verifyPassword'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent,
@@ -47,9 +47,8 @@ export default function PasswordConfirmDialog({
           {canConfirm && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="confirm-password">Enter your password to confirm</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 autoComplete="current-password"
                 autoFocus
                 value={password}

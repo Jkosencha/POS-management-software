@@ -6,6 +6,7 @@ import { MIN_PASSWORD } from '../auth/SetPassword'
 import { todayKey, daysAgoKey, startOfDay, startOfNextDay } from '../lib/dates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -88,16 +89,16 @@ function PasswordSection() {
         {msg && <div className={msg.type === 'ok' ? 'alert-success' : 'alert-error'}>{msg.text}</div>}
         <label className="field">
           <span>Current password</span>
-          <input type="password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} />
+          <PasswordInput autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} />
         </label>
         <div className="field-row">
           <label className="field">
             <span>New password</span>
-            <input type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} />
+            <PasswordInput autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} />
           </label>
           <label className="field">
             <span>Confirm new password</span>
-            <input type="password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+            <PasswordInput autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} />
           </label>
         </div>
         <p className={`text-xs mt-0 mb-3.5 ${confirm && next !== confirm ? 'text-red' : 'text-muted'}`}>
@@ -196,8 +197,8 @@ function DangerZone() {
 
       <div className="flex flex-col gap-1.5 mb-3">
         <Label htmlFor="purge-password">Your password</Label>
-        <Input
-          id="purge-password" type="password" autoComplete="current-password"
+        <PasswordInput
+          id="purge-password" autoComplete="current-password"
           value={password} onChange={e => setPassword(e.target.value)}
           placeholder="Required to delete data"
         />
