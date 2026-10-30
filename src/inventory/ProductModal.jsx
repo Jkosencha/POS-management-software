@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PartnerSelect } from '../components/PartnerBadge'
 import BatchOwners from './BatchOwners'
+import ExistingProductHint from './ExistingProductHint'
 import BuyingPriceInput from '../components/BuyingPriceInput'
 import PricingSummary from '../components/PricingSummary'
 
@@ -19,9 +20,14 @@ function Section({ title, children }) {
   )
 }
 
-export default function ProductModal({ product, categories, partners = [], onSave, onSetActive, onOwnersChanged, onClose }) {
+export default function ProductModal({
+  product, categories, partners = [], products = [],
+  onSave, onSetActive, onOwnersChanged, onRestockInstead, onClose,
+}) {
   const [f, setF] = useState({ ...product, partner_id: undefined })
-  const set = k => e => setF({ ...f, [k]: e.target.value })
+  // Functional updates: a fast second change (or a barcode scanner) can't
+  // overwrite the first with a stale copy of the form
+  const set = k => e => { const v = e.target.value; setF(prev => ({ ...prev, [k]: v })) }
   const isNew = !f.id
   // New stock needs an owner once partners exist (null = Shared is a valid choice)
   const needsOwner = isNew && partners.length > 0 && Number(f.stock) > 0 && f.partner_id === undefined
@@ -49,10 +55,17 @@ export default function ProductModal({ product, categories, partners = [], onSav
             <input value={f.barcode || ''} onChange={set('barcode')} placeholder="5901234123457" />
           </label>
         </div>
+        {isNew && (
+          <ExistingProductHint
+            draft={f}
+            products={products}
+            onRestock={onRestockInstead}
+          />
+        )}
         <div className="field-row">
           <div className="field">
             <span>Category</span>
-            <Select value={f.category || undefined} onValueChange={v => setF({ ...f, category: v })}>
+            <Select value={f.category || undefined} onValueChange={v => setF(prev => ({ ...prev, category: v }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a category" />
               </SelectTrigger>
@@ -87,7 +100,7 @@ export default function ProductModal({ product, categories, partners = [], onSav
             {partners.length > 0 && (
               <div className="field">
                 <span>Whose stock?</span>
-                <PartnerSelect partners={partners} value={f.partner_id} onChange={v => setF({ ...f, partner_id: v })} />
+                <PartnerSelect partners={partners} value={f.partner_id} onChange={v => setF(prev => ({ ...prev, partner_id: v }))} />
               </div>
             )}
           </>

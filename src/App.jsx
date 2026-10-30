@@ -102,7 +102,6 @@ export default function App() {
   const [dayCloseOpen, setDayCloseOpen] = useState(false)
   const [settings, setSettings]   = useState(DEFAULT_SETTINGS)
   const [lowStockCount, setLowStockCount] = useState(0)
-  const [todayStats, setTodayStats] = useState({ total: 0, count: 0 })
   const { isOnline, pendingCount, syncing, syncErrors, setSyncErrors, refreshCount, flushQueue, discardPending } = useOffline()
   const [queueOpen, setQueueOpen] = useState(false)
   const { isDark, setMode: setThemeMode } = useTheme()
@@ -130,34 +129,12 @@ export default function App() {
 
   useEffect(() => { if (session) fetchLowStock() }, [session, fetchLowStock])
 
-  const fetchTodayStats = useCallback(async () => {
-    if (!session) return
-    const start = new Date(); start.setHours(0, 0, 0, 0)
-    const { data } = await supabase
-      .from('sales')
-      .select('total')
-      .gte('created_at', start.toISOString())
-      .eq('status', 'completed')
-    const rows = data || []
-    setTodayStats({
-      total: rows.reduce((s, x) => s + Number(x.total), 0),
-      count: rows.length,
-    })
-  }, [session])
-
-  useEffect(() => { fetchTodayStats() }, [fetchTodayStats])
-
   useEffect(() => {
     if (!session) return
     const ch = supabase
       .channel('sidebar-sales')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, payload => {
-        setTodayStats(prev => ({
-          total: prev.total + Number(payload.new.total),
-          count: prev.count + 1,
-        }))
-        fetchLowStock()
-      })
+      // Each sale changes stock, so keep the Inventory low-stock badge current
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => fetchLowStock())
       .subscribe()
     return () => supabase.removeChannel(ch)
   }, [session, fetchLowStock])
@@ -218,9 +195,10 @@ export default function App() {
         </SidebarContent>
 
         <SidebarFooter className="px-4 pb-5">
-          <div className="rounded-lg bg-surface p-3.5 shadow-sm">
+          {/* No sales totals here: the sidebar is visible to customers at the counter */}
+          <div className="rounded-lg bg-surface px-3.5 py-3 shadow-sm">
             <button
-              className="flex items-center gap-1.5 mb-2.5 text-xs font-semibold disabled:cursor-default enabled:hover:underline"
+              className="flex items-center gap-1.5 text-xs font-semibold disabled:cursor-default enabled:hover:underline"
               onClick={() => setQueueOpen(true)}
               disabled={pendingCount === 0}
               title={pendingCount > 0 ? 'Review offline sales' : undefined}
@@ -231,9 +209,6 @@ export default function App() {
                 {pendingCount > 0 && ` · ${pendingCount} waiting to sync`}
               </span>
             </button>
-            <div className="text-[11px] font-semibold text-muted">Today</div>
-            <div className="text-lg font-bold text-ink leading-tight">{money(todayStats.total)}</div>
-            <div className="text-xs text-muted">{todayStats.count} sale{todayStats.count === 1 ? '' : 's'}</div>
           </div>
           <button
             className="flex items-center gap-2.5 mt-2 rounded-full px-3 h-10 text-sm font-medium text-ink-2 transition-colors hover:bg-white hover:text-[#6a59e4] hover:shadow-sm"

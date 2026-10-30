@@ -7,6 +7,7 @@ import { usePartners } from '../lib/partners'
 import { PartnerBadge } from '../components/PartnerBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import ProductModal from './ProductModal'
 import RestockModal from './RestockModal'
@@ -23,6 +24,7 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
   const { partners, byId } = usePartners()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('active') // 'active' | 'low' | 'inactive' | 'all'
+  const [category, setCategory] = useState('all')
   const [editProduct, setEditProduct] = useState(null)
   const [restockProduct, setRestockProduct] = useState(null)
   const [historyProduct, setHistoryProduct] = useState(null)
@@ -132,7 +134,11 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
   const inactiveCount = products.filter(p => !p.active).length
   const lowStockCount = products.filter(isLow).length
 
+  // Categories that have products, for the category dropdown
+  const usedCategories = Array.from(new Set(products.map(p => p.category))).sort((a, b) => a.localeCompare(b))
+
   const list = products.filter(p => {
+    if (category !== 'all' && p.category !== category) return false
     const needle = q.toLowerCase()
     const matchQ = !q || p.name.toLowerCase().includes(needle) || (p.sku || '').toLowerCase().includes(needle)
     if (filter === 'active') return matchQ && p.active
@@ -160,6 +166,19 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
             onChange={e => setQ(e.target.value)}
           />
         </div>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="w-[190px] rounded-full h-10 shrink-0" aria-label="Filter by category">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {usedCategories.map(c => (
+              <SelectItem key={c} value={c}>
+                {c} <span className="text-muted">({products.filter(p => p.category === c && p.active).length})</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex gap-1.5 shrink-0">
           <button className={`cat ${filter === 'active' ? 'on' : ''}`} onClick={() => setFilter('active')}>Active</button>
           <button className={`cat ${filter === 'low' ? 'on' : ''}`} onClick={() => setFilter('low')}>
@@ -240,7 +259,8 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={canManage ? 7 : 6} className="empty-grid">
                   {filter === 'low' ? 'No low-stock items. All stocked up.'
-                    : filter === 'inactive' ? 'No inactive products.' : 'Nothing here yet.'}
+                    : filter === 'inactive' ? 'No inactive products.'
+                    : category !== 'all' ? `No products in ${category} match.` : 'Nothing here yet.'}
                 </TableCell>
               </TableRow>
             )}
@@ -253,6 +273,8 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
           product={editProduct}
           categories={categories}
           partners={partners}
+          products={products}
+          onRestockInstead={p => { setEditProduct(null); setRestockProduct(p) }}
           onSave={handleSave}
           onSetActive={handleSetActive}
           onOwnersChanged={fetchProducts}
