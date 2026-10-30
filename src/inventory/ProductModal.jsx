@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PartnerSelect } from '../components/PartnerBadge'
 import BatchOwners from './BatchOwners'
+import ExistingProductHint from './ExistingProductHint'
 import BuyingPriceInput from '../components/BuyingPriceInput'
 import PricingSummary from '../components/PricingSummary'
 
@@ -19,7 +20,10 @@ function Section({ title, children }) {
   )
 }
 
-export default function ProductModal({ product, categories, partners = [], onSave, onSetActive, onOwnersChanged, onClose }) {
+export default function ProductModal({
+  product, categories, partners = [], products = [],
+  onSave, onSetActive, onOwnersChanged, onRestockInstead, onClose,
+}) {
   const [f, setF] = useState({ ...product, partner_id: undefined })
   // Functional updates: a fast second change (or a barcode scanner) can't
   // overwrite the first with a stale copy of the form
@@ -51,6 +55,13 @@ export default function ProductModal({ product, categories, partners = [], onSav
             <input value={f.barcode || ''} onChange={set('barcode')} placeholder="5901234123457" />
           </label>
         </div>
+        {isNew && (
+          <ExistingProductHint
+            draft={f}
+            products={products}
+            onRestock={onRestockInstead}
+          />
+        )}
         <div className="field-row">
           <div className="field">
             <span>Category</span>

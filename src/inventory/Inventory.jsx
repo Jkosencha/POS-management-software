@@ -273,6 +273,8 @@ export default function Inventory({ money, canManage = true, openAdd, onIntentHa
           product={editProduct}
           categories={categories}
           partners={partners}
+          products={products}
+          onRestockInstead={p => { setEditProduct(null); setRestockProduct(p) }}
           onSave={handleSave}
           onSetActive={handleSetActive}
           onOwnersChanged={fetchProducts}
