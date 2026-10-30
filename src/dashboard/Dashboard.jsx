@@ -23,7 +23,7 @@ function StatCard({ icon: Icon, label, value, sub, colorClass, onClick }) {
   return (
     <Comp
       onClick={onClick}
-      className={`group relative text-left rounded-lg p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorClass}`}
+      className={`group relative flex flex-col justify-start text-left rounded-lg p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${colorClass}`}
     >
       <div className="flex items-start justify-between mb-5">
         <div className="flex items-center gap-2">
@@ -34,7 +34,7 @@ function StatCard({ icon: Icon, label, value, sub, colorClass, onClick }) {
           <ArrowUpRight size={14} />
         </span>
       </div>
-      <div className="font-bold text-[26px] text-ink leading-none tracking-tight">{value}</div>
+      <div className="font-bold text-[22px] 2xl:text-[26px] text-ink leading-none tracking-tight whitespace-nowrap">{value}</div>
       {sub && <div className="text-xs font-medium mt-2 opacity-90">{sub}</div>}
     </Comp>
   )
