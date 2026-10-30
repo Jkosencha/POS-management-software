@@ -166,7 +166,7 @@ export default function Dashboard({ money, onNavigate, role }) {
           <SalesChart money={money} showCost={isAdmin} />
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card
             title="Top products today"
             action={isAdmin && <button className="link" onClick={() => onNavigate('reports')}>Reports</button>}
@@ -212,6 +212,14 @@ export default function Dashboard({ money, onNavigate, role }) {
                   </div>
                 )
               })
+            )}
+          </Card>
+
+          <Card title="Payment split">
+            {revenue === 0 ? (
+              <p className="text-muted text-sm m-0">No sales yet today.</p>
+            ) : (
+              <DonutChart data={payData} money={money} centerLabel="today" height={180} />
             )}
           </Card>
         </div>
@@ -263,13 +271,6 @@ export default function Dashboard({ money, onNavigate, role }) {
           </Card>
         )}
 
-        <Card title="Payment split">
-          {revenue === 0 ? (
-            <p className="text-muted text-sm m-0">No sales yet today.</p>
-          ) : (
-            <DonutChart data={payData} money={money} centerLabel="today" height={180} />
-          )}
-        </Card>
       </div>
     </div>
   )
