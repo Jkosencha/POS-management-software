@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Modal from '../components/Modal'
 import { supabase } from '../lib/supabase'
 import { verifyPassword } from '../lib/verifyPassword'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Button } from '@/components/ui/button'
 
 export default function VoidModal({ sale, money, onClose, onVoided }) {
@@ -54,8 +55,7 @@ export default function VoidModal({ sale, money, onClose, onVoided }) {
 
       <label className="field">
         <span>Your password (required)</span>
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="current-password"
           value={password}
           onChange={e => setPassword(e.target.value)}

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useSession } from './useSession'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import AuthShell from './AuthShell'
 
@@ -60,7 +61,7 @@ export default function Login() {
                 Forgot password?
               </button>
             </div>
-            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
+            <PasswordInput id="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
           </div>
           <Button type="submit" size="lg" className="w-full mt-2" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign in'}

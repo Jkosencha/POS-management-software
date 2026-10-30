@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useSession } from './useSession'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import AuthShell from './AuthShell'
 
@@ -42,12 +43,12 @@ export default function SetPassword() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="new-password">New password</Label>
-          <Input id="new-password" type="password" autoFocus autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} aria-invalid={tooShort || undefined} />
+          <PasswordInput id="new-password" autoFocus autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} aria-invalid={tooShort || undefined} />
           <span className={`text-xs ${tooShort ? 'text-red' : 'text-muted'}`}>At least {MIN_PASSWORD} characters</span>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="confirm-password">Confirm password</Label>
-          <Input id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} aria-invalid={mismatch || undefined} />
+          <PasswordInput id="confirm-password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} aria-invalid={mismatch || undefined} />
           {mismatch && <span className="text-xs text-red">Passwords don't match</span>}
         </div>
         <Button type="submit" size="lg" className="w-full mt-1" disabled={!valid || saving}>
